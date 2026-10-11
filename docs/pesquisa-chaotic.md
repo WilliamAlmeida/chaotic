@@ -41,8 +41,9 @@
 | **Scanner** ✅ | Escaneia coisas em Perim e as transforma em cartas | Mecânica de **coleção ligada à exploração** |
 | Duplicata do jogador 🟡 | Ao entrar em Chaotic, uma cópia do jogador vai para lá enquanto o "original" segue a vida na Terra; as memórias sincronizam depois | Justifica sessões de jogo sem "parar a vida" |
 
-### 2.3 Como as partidas aparecem no anime 🟡
-- O duelo é **imersivo**: o jogador **se torna** a criatura e luta em primeira pessoa dentro de uma recriação do **local** sorteado.
+### 2.3 Como as partidas aparecem no anime
+- As partidas acontecem nas **BattleDromes**: são 8, sendo 7 com nome de Codemaster (ex.: Crellan Drome, Amzen Drome) e uma **Beta Drome** de treino. Quem vence **7 partidas** numa Drome ganha o direito de desafiar o Codemaster dela ✅.
+- O duelo é descrito como uma **"versão extrema de realidade virtual"**: o jogador **assume a forma da criatura**, com os sentidos amplificados, e luta dentro de uma recriação do **local** sorteado ✅. *O anime não mostra cartas na luta; elas apenas definem quem você é, o que equipa e onde luta.*
 - Os locais influenciam a luta (terreno, efeitos), os ataques são "golpes" com nome, os Mugic são **músicas mágicas** tocadas como feitiços e os equipamentos (Battlegear) são revelados no início do combate.
 - Entre um combate e outro, a série mostra o **tabuleiro** (estratégia de posicionamento) — ou seja, há duas camadas: **tática no tabuleiro** e **ação no combate**.
 
@@ -88,7 +89,7 @@
 ### 3.4 Tabuleiro e preparação ✅/🟡
 - Cada jogador posiciona suas criaturas em **formação triangular** (pirâmide: 3‑2‑1 no 6v6) virada para o adversário; os dois triângulos formam um tabuleiro único ✅/🟡.
 - Battlegear vai **virado para baixo** sob cada criatura ✅.
-- Location deck e Attack deck embaralhados; cada jogador compra uma **mão pequena de ataques** (2–3 cartas) 🟡. Os Mugic ficam disponíveis desde o início 🟡.
+- Location deck e Attack deck embaralhados; cada jogador tem uma **mão de 3 ataques** e compra do Attack deck para voltar a ter 3 ✅. Os Mugic ficam disponíveis desde o início 🟡.
 
 ### 3.5 Estrutura do turno ✅/🟡
 1. **Passo de Local**: o jogador ativo revela o topo do seu Location deck — esse passa a ser o **Local Ativo**, com efeitos para ambos ✅.
@@ -154,7 +155,7 @@
 - **Card game digital fiel** (tabuleiro + duelo de cartas) — menor risco, foco em regras e conteúdo.
 - **Híbrido "anime"**: exploração em mundo aberto/semiaberto para **capturar** criaturas/locais/itens + duelo em arena. Aqui o combate pode ser:
   - por cartas (como o TCG), ou
-  - em **tempo real/ação**, onde as cartas de ataque viram golpes equipados e o Local vira a arena 3D (o que o anime mostrava).
+  - em **tempo real/ação**, onde as cartas de ataque viram golpes equipados e o Local vira a arena 3D (o que o anime mostrava). **→ Formato escolhido. Ver [`conceito-jogo-3d.md`](conceito-jogo-3d.md).**
 - **Começar pequeno**: formato **3v3** (pirâmide 2‑1) acelera partidas e simplifica o balanceamento.
 
 ### 5.3 MVP recomendado (vertical slice)
@@ -221,3 +222,7 @@
 - [The Card Shop Finder — Chaotic TCG returns (Panini, out/2026)](https://thecardshopfinder.com/blog/chaotic-tcg-returns-panini-relaunch-october-2026-pwa-organized-play/)
 - [License Global — Panini America and Chaotic Entertainment](https://www.licenseglobal.com/entertainment/panini-america-and-chaotic-entertainment-capturing-the-attention-of-a-new-generation)
 - [Plex — Chaotic](https://watch.plex.tv/show/chaotic)
+- [BattleDromes — Chaotic Wiki](https://chaotic.fandom.com/wiki/BattleDromes)
+- [Beta Drome — Chaotic Wiki](https://chaotic.fandom.com/wiki/Beta_Drome)
+- [Chaotic (Western Animation) — TV Tropes](https://tvtropes.org/pmwiki/pmwiki.php/WesternAnimation/Chaotic)
+- [Gonzo Library — Chaotic: The Trading Card Game Cartoon Without the Cards](https://gonzolibrary.wordpress.com/2019/11/15/chaotic-the-trading-card-game-cartoon-without-the-cards/)
