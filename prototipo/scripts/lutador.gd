@@ -161,6 +161,10 @@ func recarga_esquiva() -> float:
 		r *= 0.5
 	return r
 
+## Agilidade alta = golpes básicos mais rápidos.
+func recarga_basico() -> float:
+	return maxf(0.3, 0.62 - atributo("agilidade") * 0.0035)
+
 func mult_recarga() -> float:
 	return maxf(0.4, 1.0 - atributo("mente") * 0.004)
 
@@ -177,7 +181,7 @@ func resistencia_atordoar() -> float:
 	return clampf(atributo("animo") * 0.004, 0.0, 0.6)
 
 func dano_basico() -> float:
-	return 4.0 + atributo("forca") * 0.08
+	return 4.0 + atributo("forca") * 0.05
 
 func invulneravel() -> bool:
 	return invulneravel_t > 0.0
@@ -420,7 +424,7 @@ func esquivar(dir: Vector3) -> void:
 func ataque_basico() -> void:
 	if not pode_agir() or basico_recarga > 0.0:
 		return
-	basico_recarga = 0.45
+	basico_recarga = recarga_basico()
 	_encarar_alvo()
 	acao = {"tipo": "basico", "t": 0.0, "feito": false}
 

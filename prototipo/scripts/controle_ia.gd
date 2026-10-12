@@ -122,7 +122,8 @@ func _checar_esquiva() -> void:
 			continue
 		if proj.global_position.distance_to(lutador.centro()) < 6.0:
 			proj.set_meta("ia_viu", true)
-			if randf() < 0.35:
+			# Monstros ágeis esquivam com mais frequência.
+			if randf() < clampf(lutador.atributo("agilidade") / 180.0, 0.15, 0.55):
 				var lado := proj.direcao.cross(Vector3.UP).normalized() * (1.0 if randf() < 0.5 else -1.0)
 				lutador.esquivar(lado)
 				return
