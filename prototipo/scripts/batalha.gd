@@ -17,6 +17,8 @@ var inimigo: Lutador
 var camera: CameraOrbita
 var hud: Hud
 var perigos: Array = []
+## Obstáculos: {"corpo", "centro" (Vector2), "raio", "altura", "vida"}. Bloqueiam projéteis e quebram.
+var obstaculos: Array = []
 var tempo := 0.0
 var em_andamento := false
 var simulacao := false
@@ -26,6 +28,7 @@ var _encerrada := false
 
 
 func _ready() -> void:
+	add_to_group("batalha")
 	simulacao = bool(config.get("simulacao", false))
 	local = Dados.locais[str(config["local"])]
 	_criar_ambiente()
@@ -63,6 +66,87 @@ func _ready() -> void:
 	_intro()
 
 
+# ---------------------------------------------------------------------
+# Cenário: cobertura, linha de visão, obstáculos destrutíveis e esconderijos
+# ---------------------------------------------------------------------
+
+func obstaculo_em(pos: Vector3) -> Dictionary:
+	var plano := Vector2(pos.x, pos.z)
+	for o in obstaculos:
+		if pos.y <= float(o["altura"]) + 0.2 and plano.distance_to(o["centro"]) <= float(o["raio"]):
+			return o
+	return {}
+
+
+## Verdadeiro se nenhum obstáculo alto bloqueia o caminho entre a e b (usado pela IA antes de atirar).
+func linha_livre(a: Vector3, b: Vector3) -> bool:
+	var a2 := Vector2(a.x, a.z)
+	var b2 := Vector2(b.x, b.z)
+	for o in obstaculos:
+		var c: Vector2 = o["centro"]
+		var mais_perto := Geometry2D.get_closest_point_to_segment(c, a2, b2)
+		if mais_perto.distance_to(c) < float(o["raio"]) + 0.15 and float(o["altura"]) > minf(a.y, b.y) + 0.3:
+			return false
+	return true
+
+
+## Ponto atrás do obstáculo mais próximo, do lado oposto ao inimigo. Vector3.INF se não houver.
+func ponto_cobertura(de: Vector3, contra: Vector3, alcance := 12.0) -> Vector3:
+	var melhor := Vector3.INF
+	var melhor_dist := INF
+	for o in obstaculos:
+		if float(o["altura"]) < 1.8:
+			continue
+		var c: Vector2 = o["centro"]
+		var afastar := (c - Vector2(contra.x, contra.z)).normalized()
+		var ponto := c + afastar * (float(o["raio"]) + 1.3)
+		var dist := Vector2(de.x, de.z).distance_to(ponto)
+		if dist < alcance and dist < melhor_dist and ponto.length() < Lutador.RAIO_ARENA - 1.0:
+			melhor = Vector3(ponto.x, 0.0, ponto.y)
+			melhor_dist = dist
+	return melhor
+
+
+## Centro do capim alto / névoa mais próximo. Vector3.INF se não houver.
+func esconderijo_proximo(de: Vector3, alcance := 12.0) -> Vector3:
+	var melhor := Vector3.INF
+	var melhor_dist := alcance
+	for p in perigos:
+		if not str(p["tipo"]) in ["mato", "nevoa"]:
+			continue
+		var c: Vector2 = p["centro"]
+		var dist := Vector2(de.x, de.z).distance_to(c)
+		if dist < melhor_dist:
+			melhor = Vector3(c.x, 0.0, c.y)
+			melhor_dist = dist
+	return melhor
+
+
+func danificar_area(pos: Vector3, raio: float, dano: float) -> void:
+	var plano := Vector2(pos.x, pos.z)
+	for o in obstaculos.duplicate():
+		if plano.distance_to(o["centro"]) <= raio + float(o["raio"]):
+			danificar_obstaculo(o, dano)
+
+
+func danificar_obstaculo(o: Dictionary, dano: float) -> void:
+	if not obstaculos.has(o):
+		return
+	o["vida"] = float(o["vida"]) - dano
+	var corpo: StaticBody3D = o["corpo"]
+	if float(o["vida"]) <= 0.0:
+		obstaculos.erase(o)
+		corpo.collision_layer = 0
+		Efeitos.explosao(self, corpo.global_position + Vector3(0, float(o["altura"]) * 0.5, 0), Color(0.78, 0.68, 0.52), float(o["raio"]) * 2.5, 0.5)
+		var tw := corpo.create_tween()
+		tw.tween_property(corpo, "scale", Vector3(1.3, 0.05, 1.3), 0.35).set_ease(Tween.EASE_IN)
+		tw.tween_callback(corpo.queue_free)
+	else:
+		var tw := corpo.create_tween()
+		tw.tween_property(corpo, "scale", Vector3(0.9, 1.0, 0.9), 0.05)
+		tw.tween_property(corpo, "scale", Vector3.ONE, 0.12)
+
+
 func perigo_em(pos: Vector3) -> String:
 	var plano := Vector2(pos.x, pos.z)
 	for p in perigos:
@@ -81,9 +165,12 @@ func _physics_process(delta: float) -> void:
 		if l.energia <= 0.0:
 			continue
 		var perigo := perigo_em(l.global_position)
-		l.mult_velocidade_ambiente = 0.55 if perigo == "agua" else 1.0
-		if perigo == "lava" and l.is_on_floor():
+		# Quem voa passa por cima de lava e água.
+		l.mult_velocidade_ambiente = 0.55 if perigo == "agua" and not l.voa else 1.0
+		if perigo == "lava" and l.is_on_floor() and not l.voa:
 			l.receber_dano_ambiente(DANO_LAVA_POR_SEGUNDO * delta)
+		# Capim alto e névoa escondem quem não está atacando.
+		l.escondido = perigo in ["mato", "nevoa"] and l.acao.is_empty() and not l.cantando and not l.no_alto()
 	if bool(local.get("vento", false)):
 		_vento_t -= delta
 		if _vento_t <= 0.0:
@@ -270,6 +357,12 @@ func _criar_arena() -> void:
 		var raio := float(p["raio"])
 		var tipo := str(p["tipo"])
 		perigos.append({"tipo": tipo, "centro": centro, "raio": raio})
+		if tipo == "mato":
+			_criar_mato(centro, raio)
+			continue
+		if tipo == "nevoa":
+			_criar_nevoa(centro, raio)
+			continue
 		var poca := CylinderMesh.new()
 		poca.top_radius = raio
 		poca.bottom_radius = raio
@@ -285,10 +378,64 @@ func _criar_arena() -> void:
 		add_child(mp)
 
 
+func _criar_mato(centro: Vector2, raio: float) -> void:
+	var base := CylinderMesh.new()
+	base.top_radius = raio
+	base.bottom_radius = raio
+	base.height = 0.04
+	var mb := MeshInstance3D.new()
+	mb.mesh = base
+	mb.material_override = Efeitos.material_toon(Color("#2f5a24"), 0.0, false)
+	mb.position = Vector3(centro.x, 0.03, centro.y)
+	add_child(mb)
+	var tons := [Color("#4f8f35"), Color("#5fa63f"), Color("#3f7a2c"), Color("#77b84a")]
+	var gerador := RandomNumberGenerator.new()
+	gerador.seed = int(centro.x * 1000 + centro.y * 7)
+	for i in int(raio * raio * 4.0):
+		var ang := gerador.randf() * TAU
+		var r := sqrt(gerador.randf()) * raio * 0.95
+		var folha := CylinderMesh.new()
+		folha.top_radius = 0.0
+		folha.bottom_radius = gerador.randf_range(0.08, 0.14)
+		folha.height = gerador.randf_range(1.4, 2.1)
+		folha.radial_segments = 4
+		var mf := MeshInstance3D.new()
+		mf.mesh = folha
+		mf.material_override = Efeitos.material_toon(tons[i % tons.size()], 0.0, false)
+		mf.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mf.position = Vector3(centro.x + cos(ang) * r, folha.height / 2.0, centro.y + sin(ang) * r)
+		mf.rotation = Vector3(gerador.randf_range(-0.2, 0.2), 0.0, gerador.randf_range(-0.2, 0.2))
+		add_child(mf)
+
+
+func _criar_nevoa(centro: Vector2, raio: float) -> void:
+	var cor := Color(str(local.get("cor_ceu_horizonte", "#e8eef2"))).lightened(0.45)
+	var gerador := RandomNumberGenerator.new()
+	gerador.seed = int(centro.x * 31 + centro.y * 17)
+	for i in 7:
+		var ang := gerador.randf() * TAU
+		var r := gerador.randf() * raio * 0.6
+		var esfera := SphereMesh.new()
+		esfera.radius = 1.0
+		esfera.height = 2.0
+		var mn := MeshInstance3D.new()
+		mn.mesh = esfera
+		mn.material_override = Efeitos.material(cor, 0.2, 0.38, true)
+		mn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mn.position = Vector3(centro.x + cos(ang) * r, gerador.randf_range(0.8, 1.6), centro.y + sin(ang) * r)
+		mn.scale = Vector3(raio * 0.55, raio * 0.35, raio * 0.55) * gerador.randf_range(0.8, 1.2)
+		add_child(mn)
+		var tw := mn.create_tween().set_loops()
+		tw.tween_property(mn, "position:y", mn.position.y + 0.35, gerador.randf_range(1.5, 2.5)).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(mn, "position:y", mn.position.y, gerador.randf_range(1.5, 2.5)).set_trans(Tween.TRANS_SINE)
+
+
 func _criar_obstaculo(pos: Vector3, raio: float, altura: float, estilo: String, cor_chao: Color) -> void:
 	var corpo := StaticBody3D.new()
 	corpo.position = pos
 	add_child(corpo)
+	obstaculos.append({"corpo": corpo, "centro": Vector2(pos.x, pos.z), "raio": raio, "altura": altura,
+		"vida": 40.0 + altura * 12.0 + raio * 25.0})
 	var forma := CylinderShape3D.new()
 	forma.radius = raio
 	forma.height = altura
@@ -309,12 +456,12 @@ func _criar_obstaculo(pos: Vector3, raio: float, altura: float, estilo: String, 
 			tronco.bottom_radius = raio * 0.8
 			mi.material_override = Efeitos.material_toon(Color(0.4, 0.27, 0.16))
 			var copa := SphereMesh.new()
-			copa.radius = raio * 3.0
-			copa.height = raio * 4.5
+			copa.radius = raio * 2.1
+			copa.height = raio * 3.0
 			var mc := MeshInstance3D.new()
 			mc.mesh = copa
 			mc.material_override = Efeitos.material_toon(Color(0.22, 0.5, 0.25))
-			mc.position.y = altura + raio
+			mc.position.y = altura + raio * 0.6
 			corpo.add_child(mc)
 		"pilar":
 			tronco.top_radius = raio

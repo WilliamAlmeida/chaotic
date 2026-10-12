@@ -158,7 +158,7 @@ func _construir() -> void:
 	var dica := _rotulo("F1  controles", 14, Tema.TEXTO_SUAVE)
 	_ancorar(dica, Vector2(0, 0), Vector2(30, 188), Vector2(200, 24))
 	_raiz.add_child(dica)
-	_ajuda = _rotulo("WASD  mover\nMouse  câmera (Tab trava)\nEspaço  pular\nShift  esquivar\nClique / J  golpe básico\n1 2 3  cartas da mão\nQ  Cântico (depois WASD)\nEsc  soltar o mouse", 16, Tema.TEXTO)
+	_ajuda = _rotulo("WASD  mover\nMouse  câmera (Tab trava)\nEspaço  pular (voadores: subir)\nShift  esquivar\nClique / J  golpe básico\n1 2 3  cartas da mão\nQ  Cântico (depois WASD)\nEsc  soltar o mouse", 16, Tema.TEXTO)
 	_ajuda.add_theme_constant_override("outline_size", 6)
 	_ajuda.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	_ancorar(_ajuda, Vector2(0, 0), Vector2(30, 214), Vector2(300, 220))

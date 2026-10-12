@@ -107,6 +107,8 @@ func _carta_monstro() -> void:
 		if _retrato:
 			var lado := arte.size.y
 			draw_texture_rect(_retrato.get_texture(), Rect2(arte.get_center() - Vector2(lado, lado) / 2.0, Vector2(lado, lado)), false)
+	if bool(m.get("voa", false)):
+		_chip_texto(Vector2(arte.position.x + 6, arte.position.y + 6), "VOA", clara)
 	# Chips sobre a arte: Energia (esquerda) e elementos (direita).
 	_chip_valor(Vector2(arte.position.x + 6, arte.end.y - 36), "coracao", str(int(m["energia"])), Color("#ff6b6b"))
 	var els: Array = m["elementos"]
@@ -245,7 +247,9 @@ func _carta_local() -> void:
 		x += 52
 	var perigos := PackedStringArray()
 	for p in loc.get("perigos", []):
-		perigos.append({"lava": "lava", "agua": "água"}.get(str(p["tipo"]), str(p["tipo"])))
+		var nome_p: String = {"lava": "lava", "agua": "água", "mato": "capim alto (esconde)", "nevoa": "névoa (esconde)"}.get(str(p["tipo"]), str(p["tipo"]))
+		if not perigos.has(nome_p):
+			perigos.append(nome_p)
 	if bool(loc.get("vento", false)):
 		perigos.append("vento")
 	var extra := "" if perigos.is_empty() else " Perigos: %s." % ", ".join(perigos)
@@ -419,6 +423,12 @@ func _chip_valor(pos: Vector2, icone: String, valor: String, cor_icone: Color) -
 	Tema.texto(self, Tema.fonte("numero"), Vector2(r.position.x + 28, r.get_center().y + 9), valor, 24, Tema.TEXTO, 40, HORIZONTAL_ALIGNMENT_LEFT, 3)
 
 
+func _chip_texto(pos: Vector2, texto: String, cor: Color) -> void:
+	var r := Rect2(pos, Vector2(58, 26))
+	draw_style_box(Tema.caixa(Color(Tema.CARVAO, 0.88), Tema.OURO, 2, 6), r)
+	Tema.texto(self, Tema.fonte("titulo"), Vector2(r.position.x, r.position.y + 19), texto, 15, cor, r.size.x, HORIZONTAL_ALIGNMENT_CENTER, 2)
+
+
 func _estrela(c: Vector2, r: float, cor: Color) -> void:
 	draw_colored_polygon(PackedVector2Array([c + Vector2(0, -r), c + Vector2(r * 0.25, -r * 0.25), c + Vector2(r, 0),
 		c + Vector2(r * 0.25, r * 0.25), c + Vector2(0, r), c + Vector2(-r * 0.25, r * 0.25), c + Vector2(-r, 0), c + Vector2(-r * 0.25, -r * 0.25)]), cor)
@@ -477,7 +487,7 @@ func _paisagem(r: Rect2, loc: Dictionary) -> void:
 	_elipse_contorno(centro, rx, ry, Color(Tema.OURO, 0.6))
 	for p in loc.get("perigos", []):
 		var pos := centro + Vector2(float(p["x"]) / 20.0 * rx, float(p["z"]) / 20.0 * ry)
-		var cor_p := Color("#ff6a1f") if str(p["tipo"]) == "lava" else Color("#3f9bff")
+		var cor_p: Color = {"lava": Color("#ff6a1f"), "agua": Color("#3f9bff"), "mato": Color("#4f9a3a"), "nevoa": Color(1, 1, 1, 0.55)}.get(str(p["tipo"]), Color("#3f9bff"))
 		_elipse(pos, float(p["raio"]) / 20.0 * rx, float(p["raio"]) / 20.0 * ry, cor_p)
 	var estilo := str(loc.get("estilo_obstaculo", "rocha"))
 	for o in loc.get("obstaculos", []):

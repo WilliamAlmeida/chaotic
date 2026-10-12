@@ -148,3 +148,15 @@ O resultado é uma progressão natural:
 montar deck → dominar combate → navegar o tabuleiro → escanear novos Ecos → derrotar chefes → descobrir anomalias da Rede → enfrentar a quinta facção.
 
 Esse loop permite expandir o jogo principalmente adicionando novos JSONs, arenas e comportamentos, sem precisar modificar a estrutura central do combate.
+
+## 5. Cenário e voo (adicionado no protótipo)
+
+Nos episódios de *Chaotic* o cenário era parte da luta. No protótipo isso virou regra:
+
+- **Cobertura:** pilares, rochas e árvores bloqueiam projéteis. Ficar atrás de um obstáculo enquanto as cartas recarregam é uma tática válida.
+- **Cenário destrutível:** obstáculos têm resistência (40 + altura × 12 + raio × 25). Projéteis, golpes de Área e Saltos os quebram, e a cobertura some.
+- **Esconderijos:** capim alto (`mato`) e névoa (`nevoa`) escondem quem não está atacando. Projéteis não perseguem quem está escondido, e a IA vai até a última posição em que viu o alvo. Arenas com esconderijo: Bosque Sussurrante (nova), Terraço das Marés e Dunas de Vidro.
+- **Voo:** monstros alados pairam a 1,6 m, ignoram lava e água, e com Espaço sobem a 4,6 m por cerca de 2 s. No alto, apenas projéteis os atingem. A troca é Energia mais baixa e o risco de ser alvo fácil de projéteis.
+  - **Aerisca** (Nômades da Areia): *Vantagem de Altura*, com +20% de dano em projéteis quando está no alto.
+  - **Cinzalar** (Clã das Cinzas): *Mergulho Ígneo*. Ao descer, a próxima investida ou salto causa +6 de dano.
+- **IA "rápida":** quando tem 12 ou mais de Agilidade sobre o alvo, a IA faz kiting: ataca de longe, recua e esquiva investidas.

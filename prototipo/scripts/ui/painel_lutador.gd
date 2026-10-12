@@ -108,6 +108,10 @@ func _draw() -> void:
 		estados.append("CANTANDO")
 	if lutador.escudo > 0.0:
 		estados.append("ESCUDO %d" % roundi(lutador.escudo))
+	if lutador.no_alto():
+		estados.append("NO ALTO")
+	if lutador.escondido:
+		estados.append("ESCONDIDO")
 	var equip := str(lutador.equipamento.get("nome", "—")) if lutador.equipamento_revelado else "???"
 	var linha := "Equip: %s" % equip
 	if not estados.is_empty():

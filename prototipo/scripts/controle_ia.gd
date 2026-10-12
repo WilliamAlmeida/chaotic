@@ -1,10 +1,18 @@
 class_name ControleIA
 extends Node
-## IA simples: mantém a distância ideal para as cartas que tem na mão,
-## prefere cartas cuja condição (Desafio/Teste/Falha) está ativa,
-## tenta esquivar de projéteis e interrompe o Cântico do oponente.
+## IA do oponente.
+## - Mantém a distância ideal para as cartas da mão. Se o monstro dela é mais rápido
+##   que o alvo, faz "kiting": ataca de longe, recua quando o inimigo encosta,
+##   esquiva investidas e não se deixa encurralar na borda.
+## - Usa o cenário: espera as cartas recarregarem atrás de obstáculos ou no capim alto,
+##   e não gasta projétil se há um pilar no caminho.
+## - Voadores sobem quando o inimigo encosta; contra quem está no alto, só projéteis.
+## - Quando o alvo se esconde, vai até a última posição em que o viu.
 
 const ALCANCES := {"projetil": 15.0, "salto": 11.0}
+## Diferença de Agilidade para a IA se considerar "mais rápida" (e jogar à distância).
+const MARGEM_RAPIDO := 12.0
+const DISTANCIA_KITING := 10.0
 
 var lutador: Lutador
 var batalha  # Batalha (sem tipo para evitar dependência cíclica entre scripts)
@@ -12,6 +20,10 @@ var batalha  # Batalha (sem tipo para evitar dependência cíclica entre scripts
 var _pensar_t := 0.6
 var _lateral := 1.0
 var _lateral_t := 0.0
+var _reacao_t := 0.0
+var _ultima_vista := Vector3.INF
+var _cobertura := Vector3.INF
+var _cobertura_t := 0.0
 
 
 func _physics_process(delta: float) -> void:
@@ -25,40 +37,122 @@ func _physics_process(delta: float) -> void:
 	var para_alvo := alvo.global_position - lutador.global_position
 	para_alvo.y = 0.0
 	var dist := para_alvo.length()
-	var dir := para_alvo / dist if dist > 0.01 else Vector3.ZERO
+	var ve_alvo := not alvo.escondido or dist < 4.5
+	if ve_alvo:
+		_ultima_vista = alvo.global_position
+	var foco := _ultima_vista if _ultima_vista != Vector3.INF else alvo.global_position
+	var para_foco := foco - lutador.global_position
+	para_foco.y = 0.0
+	var dist_foco := para_foco.length()
+	var dir := para_foco / dist_foco if dist_foco > 0.01 else Vector3.ZERO
 
-	_checar_esquiva()
+	_reacao_t = maxf(0.0, _reacao_t - delta)
+	_cobertura_t = maxf(0.0, _cobertura_t - delta)
 	_lateral_t -= delta
 	if _lateral_t <= 0.0:
 		_lateral_t = randf_range(1.2, 2.8)
-		_lateral = [-1.0, 0.0, 1.0].pick_random()
+		_lateral = [-1.0, 1.0].pick_random() if _rapido() else [-1.0, 0.0, 1.0].pick_random()
+
+	_checar_esquiva(dist)
 	_pensar_t -= delta
 	if _pensar_t <= 0.0 and lutador.pode_agir():
-		_pensar_t = randf_range(0.6, 1.3)
-		_decidir(dist)
+		_pensar_t = randf_range(0.6, 1.3) * (0.85 if _rapido() else 1.0)
+		if ve_alvo:
+			_decidir(dist)
 
-	var alcance := 1.5 if alvo.cantando else _alcance_desejado()
-	var mov := Vector3.ZERO
-	if dist > alcance + 0.8:
-		mov += dir
-	elif dist < alcance - 2.0:
-		mov -= dir
-	mov += Vector3(-dir.z, 0.0, dir.x) * _lateral * 0.7
-	if batalha and mov.length() > 0.1:
+	var mov := _movimento(dist, dist_foco, dir, ve_alvo)
+	mov = _evitar_borda(mov)
+	if batalha and mov.length() > 0.1 and not lutador.voa:
 		var futuro := lutador.global_position + mov.normalized() * 1.8
 		if batalha.perigo_em(futuro) == "lava":
 			mov = Vector3(-mov.z, 0.0, mov.x)
 	lutador.direcao_movimento = mov.normalized() if mov.length() > 0.1 else Vector3.ZERO
 
 
+# ---------------------------------------------------------------------
+# Movimento
+# ---------------------------------------------------------------------
+
+func _movimento(dist: float, dist_foco: float, dir: Vector3, ve_alvo: bool) -> Vector3:
+	var alvo := lutador.alvo
+	var lateral := Vector3(-dir.z, 0.0, dir.x)
+	if not ve_alvo:
+		# Procura o alvo escondido: vai até onde o viu por último e dá uma volta por ali.
+		if dist_foco < 1.5:
+			_ultima_vista = Vector3.INF
+			return lateral * _lateral
+		return dir
+	if alvo.cantando:
+		return dir
+
+	# Esperando cartas recarregarem: busca cobertura (monstros rápidos ou feridos).
+	if _cartas_prontas() == 0 and batalha and dist > 5.0 \
+			and (_rapido() or lutador.energia < lutador.energia_max * 0.5):
+		if _cobertura_t <= 0.0:
+			_cobertura_t = 1.0
+			_cobertura = batalha.ponto_cobertura(lutador.global_position, alvo.global_position)
+			if _cobertura == Vector3.INF:
+				_cobertura = batalha.esconderijo_proximo(lutador.global_position)
+		if _cobertura != Vector3.INF:
+			var ate := _cobertura - lutador.global_position
+			ate.y = 0.0
+			return ate.normalized() if ate.length() > 0.8 else Vector3.ZERO
+
+	var alcance := _alcance_desejado()
+	var mov := Vector3.ZERO
+	if dist > alcance + 0.8:
+		mov += dir
+	elif dist < alcance - 2.0:
+		mov -= dir * (1.4 if _rapido() else 1.0)
+	mov += lateral * _lateral * (0.9 if _rapido() else 0.6)
+	return mov
+
+
+## Perto da borda da arena, puxa para dentro e para o lado (para não ficar encurralado).
+func _evitar_borda(mov: Vector3) -> Vector3:
+	var plano := Vector2(lutador.global_position.x, lutador.global_position.z)
+	var limite := Lutador.RAIO_ARENA - 4.0
+	if plano.length() <= limite:
+		return mov
+	var peso := (plano.length() - limite) / 4.0
+	var para_centro := -Vector3(plano.x, 0.0, plano.y).normalized()
+	var tangente := Vector3(-para_centro.z, 0.0, para_centro.x) * _lateral
+	return mov + (para_centro * 1.5 + tangente) * peso
+
+
+func _alcance_desejado() -> float:
+	var melhor := -1.0
+	var custo_melhor := -1.0
+	for i in MaoCartas.TAMANHO:
+		if not lutador.mao.pode_usar(i):
+			continue
+		var atk: Dictionary = Dados.ataques[lutador.mao.slots[i]]
+		if not _util_contra_alvo(atk):
+			continue
+		if float(atk["custo"]) > custo_melhor:
+			custo_melhor = float(atk["custo"])
+			melhor = _alcance(atk)
+	if melhor < 0.0:
+		# Sem cartas: o rápido se afasta (kiting); os outros vão para o corpo a corpo.
+		return DISTANCIA_KITING if _rapido() else Lutador.ALCANCE_BASICO * 0.8
+	return melhor * 0.8
+
+
+# ---------------------------------------------------------------------
+# Decisão de ataque
+# ---------------------------------------------------------------------
+
 func _decidir(dist: float) -> void:
 	var alvo := lutador.alvo
+	# Voador sobe quando o inimigo encosta (fica fora de golpes de área e investidas).
+	if lutador.voa and dist < 4.5 and not lutador.no_alto() and randf() < 0.6:
+		lutador.pular()
+		return
 	if lutador.cargas_cantico > 0 and not lutador.cantico.is_empty():
-		var e_cura := str(lutador.cantico.get("tipo", "")) == "cura"
-		if e_cura and lutador.energia < lutador.energia_max * 0.45 and dist > 7.0:
+		var tipo_cantico := str(lutador.cantico.get("tipo", ""))
+		if tipo_cantico == "cura" and lutador.energia < lutador.energia_max * 0.45 and dist > 7.0:
 			lutador.iniciar_cantico()
 			return
-		var tipo_cantico := str(lutador.cantico.get("tipo", ""))
 		if tipo_cantico == "dano" and dist < float(lutador.cantico.get("alcance", 12)) * 0.8 and randf() < 0.25:
 			lutador.iniciar_cantico()
 			return
@@ -73,20 +167,31 @@ func _decidir(dist: float) -> void:
 		if not lutador.mao.pode_usar(i):
 			continue
 		var atk: Dictionary = Dados.ataques[lutador.mao.slots[i]]
-		if dist > _alcance(atk):
+		if dist > _alcance(atk) or not _util_contra_alvo(atk):
+			continue
+		var tipo := str(atk["arquetipo"])
+		# Não atira em pilar: precisa de linha de visão.
+		if tipo == "projetil" and batalha and not batalha.linha_livre(lutador.centro(), alvo.centro()):
 			continue
 		var nota := float(atk["custo"]) + randf() * 2.0
 		if Combate.avaliar_condicao(atk.get("condicao", {}), lutador, alvo):
 			nota += 3.0
 		if alvo.cantando:
 			nota += 4.0
+		if _rapido() and tipo == "projetil":
+			nota += 1.5
 		if nota > melhor_nota:
 			melhor_nota = nota
 			melhor = i
 	if melhor >= 0:
 		lutador.usar_carta(melhor)
-	elif dist <= Lutador.ALCANCE_BASICO * maxf(lutador.escala, alvo.escala):
+	elif dist <= Lutador.ALCANCE_BASICO * maxf(lutador.escala, alvo.escala) and not alvo.no_alto():
 		lutador.ataque_basico()
+
+
+## Contra um alvo voando alto, só projéteis alcançam.
+func _util_contra_alvo(atk: Dictionary) -> bool:
+	return not lutador.alvo.no_alto() or str(atk["arquetipo"]) == "projetil"
 
 
 func _alcance(atk: Dictionary) -> float:
@@ -99,31 +204,44 @@ func _alcance(atk: Dictionary) -> float:
 	return float(ALCANCES.get(tipo, 3.0))
 
 
-func _alcance_desejado() -> float:
-	var melhor := -1.0
-	var custo_melhor := -1.0
+func _cartas_prontas() -> int:
+	var total := 0
 	for i in MaoCartas.TAMANHO:
-		if lutador.mao.pode_usar(i):
-			var atk: Dictionary = Dados.ataques[lutador.mao.slots[i]]
-			if float(atk["custo"]) > custo_melhor:
-				custo_melhor = float(atk["custo"])
-				melhor = _alcance(atk)
-	if melhor < 0.0:
-		return Lutador.ALCANCE_BASICO * 0.8
-	return melhor * 0.8
+		if lutador.mao.pode_usar(i) and _util_contra_alvo(Dados.ataques[lutador.mao.slots[i]]):
+			total += 1
+	return total
 
 
-func _checar_esquiva() -> void:
+func _rapido() -> bool:
+	return lutador.atributo("agilidade") >= lutador.alvo.atributo("agilidade") + MARGEM_RAPIDO
+
+
+# ---------------------------------------------------------------------
+# Esquiva
+# ---------------------------------------------------------------------
+
+func _checar_esquiva(dist: float) -> void:
 	if not lutador.pode_agir() or lutador.esquiva_recarga > 0.0:
 		return
+	var chance := clampf(lutador.atributo("agilidade") / 180.0, 0.15, 0.55)
+	# Investidas, saltos e golpes corpo a corpo vindo na sua direção.
+	var alvo := lutador.alvo
+	var golpe := str(alvo.acao.get("tipo", ""))
+	if _reacao_t <= 0.0 and golpe in ["investida", "salto", "basico"] and dist < 6.0:
+		_reacao_t = 0.8
+		if randf() < chance * (1.3 if _rapido() else 0.8):
+			var para_alvo := (alvo.global_position - lutador.global_position).normalized()
+			var lado := Vector3(-para_alvo.z, 0.0, para_alvo.x) * _lateral
+			lutador.esquivar(lado - para_alvo * 0.5)
+			return
+	# Projéteis.
 	for no in get_tree().get_nodes_in_group("projeteis"):
 		var proj := no as Projetil
 		if proj == null or proj.alvo != lutador or proj.has_meta("ia_viu"):
 			continue
 		if proj.global_position.distance_to(lutador.centro()) < 6.0:
 			proj.set_meta("ia_viu", true)
-			# Monstros ágeis esquivam com mais frequência.
-			if randf() < clampf(lutador.atributo("agilidade") / 180.0, 0.15, 0.55):
+			if randf() < chance:
 				var lado := proj.direcao.cross(Vector3.UP).normalized() * (1.0 if randf() < 0.5 else -1.0)
 				lutador.esquivar(lado)
 				return

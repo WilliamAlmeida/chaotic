@@ -88,7 +88,7 @@ static func aplicar_ataque(ataque: Dictionary, atacante: Lutador, alvo: Lutador,
 		if str(efeito.get("tipo", "")) == "dano_extra":
 			dano += float(efeito.get("valor", 0))
 
-	var resultado := atacante.modificar_dano_causado(dano)
+	var resultado := atacante.modificar_dano_causado(dano, ataque)
 	var critico: bool = resultado[1]
 	var final := alvo.modificar_dano_recebido(float(resultado[0]), ataque)
 	alvo.receber_dano(final, atacante)

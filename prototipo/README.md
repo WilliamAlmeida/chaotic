@@ -3,13 +3,13 @@
 Protótipo jogável do conceito em [`../docs/conceito-jogo-3d.md`](../docs/conceito-jogo-3d.md): um jogo de **ação 3D** em que as **cartas são o loadout**, como no anime *Chaotic*. Elas definem o monstro que você controla, o equipamento que ele carrega, o cenário da luta, o Cântico (magia musical) e os golpes que aparecem na sua mão durante o combate.
 
 - Visual: **cel shading de anime com contorno**, cartas e HUD seguindo o conceito de GUI em [`../docs/gui-conceito.md`](../docs/gui-conceito.md).
-- Conteúdo: **12 monstros, 24 ataques, 8 equipamentos, 6 Cânticos e 6 arenas** do mundo de Teralume ([`../docs/design-teralume.md`](../docs/design-teralume.md)).
+- Conteúdo: **14 monstros (2 voadores), 24 ataques, 8 equipamentos, 6 Cânticos e 7 arenas** do mundo de Teralume ([`../docs/design-teralume.md`](../docs/design-teralume.md)).
 
 > Nomes, monstros, símbolos e textos são **próprios**. Nada usa marca, nomes ou arte de *Chaotic*.
 
-| Carregamento de Combate | Luta | Cântico (mini-ritmo) |
-|---|---|---|
-| ![loadout](capturas/loadout.png) | ![luta](capturas/luta.png) | ![cantico](capturas/cantico.png) |
+| Carregamento de Combate | Luta | Cântico (mini-ritmo) | Voo no Bosque Sussurrante |
+|---|---|---|---|
+| ![loadout](capturas/loadout.png) | ![luta](capturas/luta.png) | ![cantico](capturas/cantico.png) | ![voo](capturas/voo.png) |
 
 ## Como rodar
 
@@ -25,7 +25,7 @@ Os monstros e cenários são montados com formas primitivas em código, então n
 |---|---|---|
 | Mover | WASD / setas | analógico esquerdo / D-pad |
 | Câmera | mouse (Tab trava/destrava no inimigo) | R3 trava |
-| Pular | Espaço | A |
+| Pular (voadores: subir alto) | Espaço | A |
 | Esquivar (fica invulnerável por um instante) | Shift | B |
 | Golpe básico | clique esquerdo / J | X |
 | Cartas de ataque da mão | 1, 2, 3 | LB, Y, RB |
@@ -50,15 +50,17 @@ No loadout: setas ‹ › (ou clique na carta) trocam a carta. Clique nas cartas
 | **Local** | 6 arenas com bônus elemental, **iniciativa** (quem vence começa com a mão pronta), lava, água que deixa lento e rajadas de vento. Pode ser sorteado |
 | **Visual anime** | Shader de cel shading em 2 tons com sombra roxa e rim light, contorno de espessura constante, olhos grandes, contador de **combo** ("3 GOLPES – Boa Sequência!") |
 | **Interface** | Cartas desenhadas em código (estados normal, hover, selecionada, desabilitada e recarregando), retrato 3D do monstro dentro da carta e na HUD, ícones e símbolos vetoriais |
-| **IA** | Mantém a distância certa para as cartas da mão, prefere condições ativas, esquiva projéteis, interrompe Cânticos, usa escudo e evita lava |
+| **Voo** | Monstros com `"voa": true` (Aerisca, Cinzalar) pairam acima do chão, ignoram lava e água e batem asas. Com Espaço sobem alto por ~2 s: lá em cima só **projéteis** os alcançam (Área, Investida, Salto e golpe básico erram) |
+| **Cenário** | Obstáculos **bloqueiam projéteis** (cobertura) e **quebram** com dano (projéteis, Área e Salto). **Capim alto** e **névoa** escondem quem não está atacando: projéteis não perseguem e a IA perde você de vista |
+| **IA** | Mantém a distância certa para as cartas da mão. Se o monstro dela é **mais rápido**, faz kiting (ataca de longe, recua, esquiva investidas e não se deixa encurralar). Espera recarga **atrás de obstáculos** ou no capim, não atira em pilar no caminho, caça quem se escondeu, sobe quando é voadora e contra voadores no alto usa só projéteis. Também interrompe Cânticos, usa escudo e evita lava |
 
 ## Criar ou alterar conteúdo
 
 Tudo fica em `data/*.json`, sem mexer em código:
 
 - `faccoes.json`: cores e marca (`chamas`, `onda`, `colmeia`, `sol`)
-- `monstros.json`: atributos, energia, elementos, `faccao`, `forma`, `pecas` (silhueta) e `passiva`
-  - Peças disponíveis: `chifres`, `chifres_frente`, `crista`, `cauda`, `cauda_cones`, `barbatanas_ombro`, `barbatanas_braco`, `placas_costas`, `punhos`, `casco`, `ombreiras_cone`, `ombreiras_bloco`, `ombreiras_esfera`, `ombreiras_inclinadas`, `nucleo`, `ornamentos`, `nos_perola`, `cristais`, `laminas_laterais`, `aureola` e `manto`
+- `monstros.json`: atributos, energia, elementos, `faccao`, `forma`, `voa` (opcional), `pecas` (silhueta) e `passiva`
+  - Peças disponíveis: `chifres`, `chifres_frente`, `crista`, `cauda`, `cauda_cones`, `barbatanas_ombro`, `barbatanas_braco`, `placas_costas`, `punhos`, `casco`, `ombreiras_cone`, `ombreiras_bloco`, `ombreiras_esfera`, `ombreiras_inclinadas`, `nucleo`, `ornamentos`, `nos_perola`, `cristais`, `laminas_laterais`, `aureola`, `manto` e `asas` (batem quando o monstro voa)
 - `ataques.json`: `custo`, `arquetipo`, `dano_base`, `bonus_elemento`, `velocidade`, `tamanho` (em Área e Salto, o raio é `tamanho` × 2,2) e `condicao`:
   ```json
   "condicao": {"tipo": "desafio", "atributo": "agilidade", "margem": 1,
@@ -66,6 +68,7 @@ Tudo fica em `data/*.json`, sem mexer em código:
   ```
   Efeitos: `dano_extra`, `atordoar` (segundos), `empurrar` (força de 1 a 10), `cura` e `roubar_carga`.
 - `equipamentos.json`, `canticos.json` (`cura`/`dano`/`escudo`) e `locais.json`
+  - `perigos` dos locais: `lava` (dano), `agua` (lentidão), `mato` (capim alto que esconde) e `nevoa` (névoa que esconde). Os `obstaculos` `[x, z, raio, altura]` viram cobertura destrutível
 
 **Arte final das cartas:** salve `arte/cartas/<id>.png` e ela substitui a arte procedural automaticamente.
 

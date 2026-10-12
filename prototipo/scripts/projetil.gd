@@ -14,10 +14,12 @@ var cor := Color.WHITE
 var _vida := 2.5
 var _curva := 1.2
 var _desviado := false
+var _batalha: Node
 
 
 func _ready() -> void:
 	add_to_group("projeteis")
+	_batalha = get_tree().get_first_node_in_group("batalha")
 	var esfera := SphereMesh.new()
 	esfera.radius = raio
 	esfera.height = raio * 2.0
@@ -41,7 +43,7 @@ func _physics_process(delta: float) -> void:
 		queue_free()
 		return
 	var alvo_valido := is_instance_valid(alvo) and alvo.energia > 0.0
-	if alvo_valido and not _desviado and alvo.miragem_t <= 0.0:
+	if alvo_valido and not _desviado and alvo.miragem_t <= 0.0 and not alvo.escondido:
 		var desejada := (alvo.centro() - global_position).normalized()
 		direcao = direcao.lerp(desejada, clampf(_curva * delta, 0.0, 1.0)).normalized()
 	global_position += direcao * velocidade * delta
@@ -54,6 +56,14 @@ func _physics_process(delta: float) -> void:
 		else:
 			Combate.aplicar_ataque(ataque, dono, alvo, local)
 			Efeitos.explosao(get_parent(), global_position, cor, 1.4)
+			queue_free()
+			return
+	# Obstáculos do cenário bloqueiam projéteis (e sofrem o dano).
+	if _batalha:
+		var obstaculo: Dictionary = _batalha.obstaculo_em(global_position)
+		if not obstaculo.is_empty():
+			_batalha.danificar_obstaculo(obstaculo, float(ataque.get("dano_base", 0)) * 1.5)
+			Efeitos.explosao(get_parent(), global_position, cor, 1.0)
 			queue_free()
 			return
 	if global_position.y < 0.0:

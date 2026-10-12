@@ -15,6 +15,10 @@ const TAMANHO_SEQUENCIA_CANTICO := 4
 const TECLAS_CANTICO := ["mover_frente", "mover_esq", "mover_tras", "mover_dir"]
 const DURACAO_ESCUDO := 8.0
 const JANELA_COMBO := 2.5
+## Monstros que voam pairam a esta altura; com Espaço sobem até ALTURA_VOO_ALTO.
+const ALTURA_VOO := 1.6
+const ALTURA_VOO_ALTO := 4.6
+const DURACAO_SUBIDA := 2.2
 
 # --- Dados vindos das cartas ---
 var id_monstro := ""
@@ -56,6 +60,9 @@ var mult_velocidade_ambiente := 1.0
 var escudo := 0.0
 var escudo_t := 0.0
 var miragem_t := 0.0
+var voa := false
+## Dentro de capim alto/névoa e parado de atacar: projéteis não perseguem e a IA perde de vista.
+var escondido := false
 var combo := 0
 
 var cantando := false
@@ -74,10 +81,13 @@ var _impulso_t := 0.0
 var _armadura := false
 var _corpo_duna_espera := 0.0
 var _combo_t := 0.0
+var _subida_t := 0.0
+var _mergulho := false
 
 # --- Visual ---
 var _visual: Node3D
 var _orbita: Node3D
+var _asas: Array[Node3D] = []
 var _materiais: Array[ShaderMaterial] = []
 var _flash_t := 0.0
 var _anim_t := 0.0
@@ -103,6 +113,7 @@ func configurar(monstro_id: String, equip_id: String, cantico_id: String, deck_i
 	deck = deck_ids.duplicate()
 	escala = float(dados_monstro.get("escala", 1.0))
 	forma = str(dados_monstro.get("forma", "agil"))
+	voa = bool(dados_monstro.get("voa", false))
 	var base: Dictionary = dados_monstro["atributos"]
 	for chave in Dados.ATRIBUTOS:
 		atributos[chave] = float(base.get(chave, 0))
@@ -186,6 +197,10 @@ func dano_basico() -> float:
 func invulneravel() -> bool:
 	return invulneravel_t > 0.0
 
+## Voando alto: fora do alcance de golpes de área, investidas e golpe básico.
+func no_alto() -> bool:
+	return voa and global_position.y > 3.2
+
 func centro() -> Vector3:
 	return global_position + Vector3(0, 1.1 * escala, 0)
 
@@ -201,7 +216,13 @@ func pode_agir() -> bool:
 # Ganchos usados pelas regras de combate (passivas)
 # =====================================================================
 
-func modificar_dano_causado(valor: float) -> Array:
+func modificar_dano_causado(valor: float, ataque: Dictionary = {}) -> Array:
+	var arquetipo := str(ataque.get("arquetipo", ""))
+	if passiva == "vantagem_altura" and no_alto() and arquetipo == "projetil":
+		valor *= 1.2
+	if _mergulho and arquetipo in ["investida", "salto"]:
+		_mergulho = false
+		valor += 6.0
 	var critico := randf() < chance_critico()
 	if critico:
 		valor *= 1.5
@@ -271,6 +292,7 @@ func _physics_process(delta: float) -> void:
 		if not is_on_floor():
 			velocity.y -= GRAVIDADE * delta
 		move_and_slide()
+		_animar_asas(delta, false)
 		return
 
 	_atualizar_timers(delta)
@@ -310,8 +332,7 @@ func _physics_process(delta: float) -> void:
 	if usar_fisica:
 		velocity.x = horizontal.x + empurrao.x
 		velocity.z = horizontal.z + empurrao.z
-		if not is_on_floor():
-			velocity.y -= GRAVIDADE * delta
+		_aplicar_vertical(delta)
 		move_and_slide()
 	_limitar_arena()
 	_animar(delta, horizontal)
@@ -326,6 +347,11 @@ func _atualizar_timers(delta: float) -> void:
 	miragem_t = maxf(0.0, miragem_t - delta)
 	_impulso_t = maxf(0.0, _impulso_t - delta)
 	_corpo_duna_espera = maxf(0.0, _corpo_duna_espera - delta)
+	if _subida_t > 0.0:
+		_subida_t -= delta
+		if _subida_t <= 0.0 and passiva == "mergulho_igneo":
+			_mergulho = true
+			mostrar_texto("Mergulho Ígneo pronto", Color(1.0, 0.6, 0.3), 36)
 	_t_sem_dano += delta
 	if _combo_t > 0.0:
 		_combo_t -= delta
@@ -348,7 +374,8 @@ func _processar_acao(delta: float) -> Vector3:
 				acao["feito"] = true
 				var ponto := global_position + _frente() * 1.2 * escala + Vector3(0, 1.0 * escala, 0)
 				Efeitos.explosao(get_parent(), ponto, Color(1, 1, 1), 0.6, 0.2)
-				if alvo and _distancia_plana(alvo) <= ALCANCE_BASICO * maxf(escala, alvo.escala):
+				if alvo and _distancia_plana(alvo) <= ALCANCE_BASICO * maxf(escala, alvo.escala) \
+						and absf(alvo.global_position.y - global_position.y) < 2.2:
 					Combate.aplicar_ataque(_ataque_basico_dados(), self, alvo, local)
 			if t >= 0.35:
 				acao = {}
@@ -363,6 +390,7 @@ func _processar_acao(delta: float) -> Vector3:
 				acao["feito"] = true
 				var raio := Dados.raio_ataque(atk)
 				Efeitos.explosao(get_parent(), global_position + Vector3(0, 0.4, 0), cor_ataque(atk), raio, 0.4)
+				_dano_cenario(global_position, raio, float(atk.get("dano_base", 0)) * 2.0)
 				if alvo and _distancia_plana(alvo) <= raio + alvo.raio_acerto() * 0.5 \
 						and absf(alvo.global_position.y - global_position.y) < 2.5:
 					Combate.aplicar_ataque(atk, self, alvo, local)
@@ -390,7 +418,9 @@ func _processar_acao(delta: float) -> Vector3:
 				acao["feito"] = true
 				var raio := Dados.raio_ataque(atk)
 				Efeitos.explosao(get_parent(), global_position + Vector3(0, 0.3, 0), cor_ataque(atk), raio, 0.4)
-				if alvo and _distancia_plana(alvo) <= raio + alvo.raio_acerto() * 0.5:
+				_dano_cenario(global_position, raio, float(atk.get("dano_base", 0)) * 2.0)
+				if alvo and _distancia_plana(alvo) <= raio + alvo.raio_acerto() * 0.5 \
+						and absf(alvo.global_position.y - global_position.y) < 2.5:
 					Combate.aplicar_ataque(atk, self, alvo, local)
 				if passiva == "duplo_horizonte":
 					miragem_t = 1.5
@@ -405,8 +435,30 @@ func _processar_acao(delta: float) -> Vector3:
 # =====================================================================
 
 func pular() -> void:
-	if pode_agir() and is_on_floor():
+	if not pode_agir():
+		return
+	if voa:
+		if _subida_t <= 0.0:
+			_subida_t = DURACAO_SUBIDA
+	elif is_on_floor():
 		velocity.y = 9.0
+
+
+func _aplicar_vertical(delta: float) -> void:
+	if voa:
+		var altura := ALTURA_VOO_ALTO if _subida_t > 0.0 else ALTURA_VOO
+		velocity.y = (altura - global_position.y) * 5.0
+	elif not is_on_floor():
+		velocity.y -= GRAVIDADE * delta
+
+
+## Golpes de área e saltos também quebram obstáculos do cenário.
+func _dano_cenario(pos: Vector3, raio: float, dano: float) -> void:
+	if not is_inside_tree():
+		return
+	var batalha := get_tree().get_first_node_in_group("batalha")
+	if batalha:
+		batalha.danificar_area(pos, raio, dano)
 
 
 func esquivar(dir: Vector3) -> void:
@@ -765,9 +817,12 @@ func _animar(delta: float, horizontal: Vector3) -> void:
 		return
 	if _orbita:
 		_orbita.rotation.y += delta * 0.8
+	_animar_asas(delta, true)
 	var mov := Vector2(horizontal.x, horizontal.z).length()
 	var alvo_y := 0.0
-	if forma == "mistico":
+	if voa:
+		alvo_y = sin(_anim_t * 3.0) * 0.12
+	elif forma == "mistico":
 		alvo_y = 0.15 + sin(_anim_t * 2.5) * 0.12
 	elif mov > 0.5 and is_on_floor():
 		alvo_y = absf(sin(_anim_t * 12.0)) * 0.12
@@ -788,6 +843,16 @@ func _animar(delta: float, horizontal: Vector3) -> void:
 		_visual.rotation.y = sin(_anim_t * 5.0) * 0.5
 	else:
 		_visual.rotation.y = lerpf(_visual.rotation.y, 0.0, 1.0 - exp(-10.0 * delta))
+
+
+func _animar_asas(_delta: float, vivo: bool) -> void:
+	if _asas.is_empty():
+		return
+	var ritmo := 14.0 if _subida_t > 0.0 else 9.0
+	for asa in _asas:
+		var lado := signf(asa.position.x)
+		var abertura := 0.15 if not vivo else 0.35 + 0.5 * sin(_anim_t * ritmo)
+		asa.rotation.z = lado * abertura
 
 
 func _atualizar_flash(delta: float) -> void:
@@ -951,6 +1016,16 @@ func _acessorio(tipo: String, cor: Color, detalhe: Color, escura: Color) -> void
 			_peca(_torus(0.4, 0.5), detalhe, cabeca + Vector3(0, rc + 0.35, 0.1), Vector3(15, 0, 0), 0.8, null, false)
 		"manto":
 			_peca(_cone(0.75, 1.05), escura.darkened(0.15), Vector3(0, 0.75, 0.05), Vector3(180, 0, 0))
+		"asas":
+			for s in [-1.0, 1.0]:
+				var pivo := Node3D.new()
+				pivo.position = costas + Vector3(s * 0.18, 0.25, 0.05)
+				_visual.add_child(pivo)
+				_asas.append(pivo)
+				var asa := _peca(_cone(0.5, 1.5), detalhe, Vector3(s * 0.75, 0.05, 0.1), Vector3(0, 0, -s * 90), 0.4, pivo)
+				asa.scale = Vector3(1, 1, 0.14)
+				var pena := _peca(_cone(0.32, 1.1), cor, Vector3(s * 0.6, -0.25, 0.14), Vector3(0, 0, -s * 115), 0.0, pivo)
+				pena.scale = Vector3(1, 1, 0.12)
 
 
 func _criar_equipamento() -> void:
