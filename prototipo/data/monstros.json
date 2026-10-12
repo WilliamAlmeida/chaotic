@@ -1,44 +1,14 @@
 [
-  {
-    "id": "brasario",
-    "nome": "Brasário",
-    "descricao": "Predador ágil das encostas vulcânicas. Rápido e agressivo.",
-    "forma": "agil",
-    "cor": "#e8632b",
-    "cor_detalhe": "#ffd166",
-    "escala": 1.0,
-    "atributos": {"agilidade": 80, "forca": 50, "mente": 45, "animo": 65},
-    "energia": 275,
-    "elementos": ["brasa", "tempestade"],
-    "cargas_cantico": 2,
-    "passiva": {"tipo": "furia", "descricao": "Fúria: abaixo de 40% de Energia causa +30% de dano."}
-  },
-  {
-    "id": "rochedo",
-    "nome": "Rochedo",
-    "descricao": "Colosso de pedra e magma. Lento, mas cada golpe pesa.",
-    "forma": "robusto",
-    "cor": "#8d6e4a",
-    "cor_detalhe": "#ff8a3d",
-    "escala": 1.2,
-    "atributos": {"agilidade": 35, "forca": 85, "mente": 50, "animo": 60},
-    "energia": 265,
-    "elementos": ["pedra", "brasa"],
-    "cargas_cantico": 1,
-    "passiva": {"tipo": "pele_rocha", "descricao": "Pele de Rocha: recebe 2 de dano a menos em cada golpe."}
-  },
-  {
-    "id": "ondina",
-    "nome": "Ondina",
-    "descricao": "Espírito das marés que flutua sobre a água. Mestra dos Cânticos.",
-    "forma": "mistico",
-    "cor": "#3a7bd5",
-    "cor_detalhe": "#9be7ff",
-    "escala": 1.0,
-    "atributos": {"agilidade": 65, "forca": 40, "mente": 85, "animo": 50},
-    "energia": 300,
-    "elementos": ["mare", "tempestade"],
-    "cargas_cantico": 3,
-    "passiva": {"tipo": "fluxo", "descricao": "Fluxo Vital: regenera 2 de Energia por segundo."}
-  }
+  {"id": "cindravil", "nome": "Cindravil", "descricao": "Predador vulcânico leve que converte movimento contínuo em rajadas ofensivas.", "faccao": "cinzas", "forma": "agil", "cor": "#e34d2f", "cor_detalhe": "#ffc26b", "escala": 0.92, "atributos": {"agilidade": 92, "forca": 48, "mente": 40, "animo": 72}, "energia": 245, "elementos": ["brasa", "tempestade"], "cargas_cantico": 2, "passiva": {"tipo": "rastro_quente", "nome": "Rastro Quente", "descricao": "Após realizar uma esquiva, sua próxima carta de projétil recarrega 20% mais rápido."}, "pecas": ["barbatanas_ombro", "cauda_cones", "chifres"]},
+  {"id": "braseonte", "nome": "Braseonte", "descricao": "Colosso de minério queimado que avança lentamente enquanto absorve impactos.", "faccao": "cinzas", "forma": "robusto", "cor": "#a52d20", "cor_detalhe": "#ff9d45", "escala": 1.18, "atributos": {"agilidade": 38, "forca": 88, "mente": 42, "animo": 78}, "energia": 320, "elementos": ["brasa", "pedra"], "cargas_cantico": 1, "passiva": {"tipo": "crosta_termica", "nome": "Crosta Térmica", "descricao": "O primeiro dano recebido após quatro segundos sem sofrer ataques é reduzido em 35%."}, "pecas": ["placas_costas", "punhos"]},
+  {"id": "pirocanto", "nome": "Pirocanto", "descricao": "Entidade cerimonial que transforma ressonância mental em combustão controlada.", "faccao": "cinzas", "forma": "mistico", "cor": "#d83b26", "cor_detalhe": "#ffe09a", "escala": 1.02, "atributos": {"agilidade": 52, "forca": 38, "mente": 94, "animo": 76}, "energia": 255, "elementos": ["brasa", "tempestade"], "cargas_cantico": 3, "passiva": {"tipo": "refrao_igneo", "nome": "Refrão Ígneo", "descricao": "Após usar um Cântico, o próximo ataque com bônus de Brasa recebe 20% de dano elemental adicional."}, "pecas": ["nucleo", "ornamentos", "manto"]},
+  {"id": "velamar", "nome": "Velamar", "descricao": "Caçador anfíbio de movimentos largos que combina velocidade e ataques em fluxo.", "faccao": "mares", "forma": "agil", "cor": "#3387d9", "cor_detalhe": "#9de8ff", "escala": 0.96, "atributos": {"agilidade": 84, "forca": 55, "mente": 63, "animo": 68}, "energia": 260, "elementos": ["mare", "tempestade"], "cargas_cantico": 2, "passiva": {"tipo": "corrente_lateral", "nome": "Corrente Lateral", "descricao": "Mover-se continuamente por dois segundos aumenta temporariamente sua eficiência de esquiva."}, "pecas": ["barbatanas_braco", "crista", "cauda"]},
+  {"id": "abissarca", "nome": "Abissarca", "descricao": "Guardião oceânico coberto por placas densas e estruturas semelhantes a conchas.", "faccao": "mares", "forma": "robusto", "cor": "#175aa5", "cor_detalhe": "#77d8db", "escala": 1.2, "atributos": {"agilidade": 35, "forca": 86, "mente": 58, "animo": 82}, "energia": 318, "elementos": ["mare", "pedra"], "cargas_cantico": 2, "passiva": {"tipo": "lastro_abissal", "nome": "Lastro Abissal", "descricao": "Efeitos de empurrão sofridos têm sua distância reduzida pela metade."}, "pecas": ["casco", "ombreiras_cone"]},
+  {"id": "nacarim", "nome": "Nacarim", "descricao": "Oráculo marinho que manipula campos líquidos e padrões de energia acumulada.", "faccao": "mares", "forma": "mistico", "cor": "#4da9c8", "cor_detalhe": "#e4fbff", "escala": 1.0, "atributos": {"agilidade": 50, "forca": 36, "mente": 96, "animo": 72}, "energia": 252, "elementos": ["mare", "tempestade"], "cargas_cantico": 3, "passiva": {"tipo": "memoria_das_ondas", "nome": "Memória das Ondas", "descricao": "Sempre que recupera Energia, reduz ligeiramente a recarga da carta há mais tempo indisponível."}, "pecas": ["nos_perola", "barbatanas_braco", "manto"]},
+  {"id": "talhuno", "nome": "Talhuno", "descricao": "Gigante mineral construído em torno de um núcleo extremamente denso.", "faccao": "rocha", "forma": "robusto", "cor": "#736657", "cor_detalhe": "#d4b985", "escala": 1.22, "atributos": {"agilidade": 32, "forca": 94, "mente": 46, "animo": 80}, "energia": 320, "elementos": ["pedra"], "cargas_cantico": 1, "passiva": {"tipo": "nucleo_pesado", "nome": "Núcleo Pesado", "descricao": "Enquanto estiver no chão e sem saltar, recebe 15% menos dano de investidas."}, "pecas": ["ombreiras_bloco", "punhos"]},
+  {"id": "prismolito", "nome": "Prismolito", "descricao": "Construto cristalino capaz de reorganizar energia elemental através de suas faces.", "faccao": "rocha", "forma": "mistico", "cor": "#776f8e", "cor_detalhe": "#c7f0ff", "escala": 1.05, "atributos": {"agilidade": 44, "forca": 50, "mente": 92, "animo": 72}, "energia": 270, "elementos": ["pedra", "tempestade"], "cargas_cantico": 3, "passiva": {"tipo": "refracao_tatica", "nome": "Refração Tática", "descricao": "O primeiro ataque elemental após cada Cântico tem sua condição facilitada."}, "pecas": ["cristais", "nucleo"]},
+  {"id": "craguil", "nome": "Craguil", "descricao": "Predador de placas minerais que usa aceleração curta para quebrar formações inimigas.", "faccao": "rocha", "forma": "agil", "cor": "#8a7452", "cor_detalhe": "#f0ce82", "escala": 1.03, "atributos": {"agilidade": 78, "forca": 68, "mente": 52, "animo": 64}, "energia": 275, "elementos": ["pedra", "brasa"], "cargas_cantico": 2, "passiva": {"tipo": "impulso_de_lasca", "nome": "Impulso de Lasca", "descricao": "Após acertar uma investida, ganha velocidade de movimento por dois segundos."}, "pecas": ["chifres_frente", "placas_costas", "cauda"]},
+  {"id": "sirocal", "nome": "Sirocal", "descricao": "Corredor das dunas que usa correntes de ar para mudar de direção durante ataques.", "faccao": "areia", "forma": "agil", "cor": "#d5a13e", "cor_detalhe": "#fff0a8", "escala": 0.9, "atributos": {"agilidade": 94, "forca": 42, "mente": 58, "animo": 66}, "energia": 242, "elementos": ["tempestade", "pedra"], "cargas_cantico": 2, "passiva": {"tipo": "passo_sem_rastro", "nome": "Passo sem Rastro", "descricao": "Depois de permanecer em velocidade máxima por dois segundos, seu próximo ataque sofre menos interrupção."}, "pecas": ["crista", "ombreiras_inclinadas", "cauda_cones"]},
+  {"id": "dunamonte", "nome": "Dunamonte", "descricao": "Massa ambulante de placas arenosas que redistribui impacto através do próprio corpo.", "faccao": "areia", "forma": "robusto", "cor": "#a77b38", "cor_detalhe": "#e8ce8c", "escala": 1.16, "atributos": {"agilidade": 40, "forca": 82, "mente": 60, "animo": 76}, "energia": 310, "elementos": ["pedra", "tempestade"], "cargas_cantico": 2, "passiva": {"tipo": "corpo_de_duna", "nome": "Corpo de Duna", "descricao": "Ao resistir a um empurrão, reduz parcialmente a recarga de uma carta de investida."}, "pecas": ["placas_costas", "ombreiras_esfera"]},
+  {"id": "miralume", "nome": "Miralume", "descricao": "Entidade do horizonte quente que distorce distância e direção ao redor de seu corpo.", "faccao": "areia", "forma": "mistico", "cor": "#c9924b", "cor_detalhe": "#7ce7e1", "escala": 0.98, "atributos": {"agilidade": 72, "forca": 38, "mente": 90, "animo": 70}, "energia": 250, "elementos": ["tempestade", "brasa"], "cargas_cantico": 3, "passiva": {"tipo": "duplo_horizonte", "nome": "Duplo Horizonte", "descricao": "Após executar um salto, deixa brevemente uma imagem residual que dificulta a leitura de sua direção real."}, "pecas": ["ornamentos", "laminas_laterais", "aureola"]}
 ]

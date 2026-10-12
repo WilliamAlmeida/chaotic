@@ -8,6 +8,8 @@ extends RefCounted
 
 const NOMES_CONDICAO := {"desafio": "Desafio", "teste": "Teste", "falha": "Falha"}
 const EMPURRAO_BASE := 3.0
+## O "valor" de empurrar nas cartas é uma força de 1 a 10; vira impulso em m/s.
+const ESCALA_EMPURRAO := 3.0
 
 
 static func avaliar_condicao(cond: Dictionary, atacante: Lutador, alvo: Lutador) -> bool:
@@ -77,23 +79,25 @@ static func aplicar_ataque(ataque: Dictionary, atacante: Lutador, alvo: Lutador,
 		alvo.mostrar_texto("Esquivou!", Color(0.85, 0.85, 0.85))
 		return
 
-	var dano := float(ataque.get("dano_base", 0)) + dano_elemental(ataque, atacante, local)
+	var dano := float(ataque.get("dano_base", 0)) + dano_elemental(ataque, atacante, local) * atacante.mult_elemental(ataque)
 	var cond: Dictionary = ataque.get("condicao", {})
 	var efeito: Dictionary = {}
-	if avaliar_condicao(cond, atacante, alvo):
+	if atacante.condicao_garantida(ataque) or avaliar_condicao(cond, atacante, alvo):
 		efeito = cond.get("efeito", {})
-		atacante.mostrar_texto(str(NOMES_CONDICAO.get(str(cond["tipo"]), "")) + "!", Color(0.5, 1.0, 0.5), 48)
+		atacante.mostrar_texto(str(NOMES_CONDICAO.get(str(cond["tipo"]), "")) + "!", Color(0.5, 1.0, 0.5), 44)
 		if str(efeito.get("tipo", "")) == "dano_extra":
 			dano += float(efeito.get("valor", 0))
 
 	var resultado := atacante.modificar_dano_causado(dano)
 	var critico: bool = resultado[1]
-	var final := alvo.modificar_dano_recebido(float(resultado[0]))
+	var final := alvo.modificar_dano_recebido(float(resultado[0]), ataque)
 	alvo.receber_dano(final, atacante)
-	if critico:
-		alvo.mostrar_texto("CRÍTICO %d" % roundi(final), Color(1.0, 0.35, 0.3), 80)
-	else:
-		alvo.mostrar_texto("%d" % roundi(final), Color(1.0, 0.95, 0.9))
+	atacante.registrar_acerto(ataque)
+	if final > 0.0:
+		if critico:
+			alvo.mostrar_texto("CRÍTICO %d" % roundi(final), Color(1.0, 0.35, 0.3), 80)
+		else:
+			alvo.mostrar_texto("%d" % roundi(final), Color(1.0, 0.95, 0.9))
 
 	var dir := alvo.global_position - atacante.global_position
 	dir.y = 0.0
@@ -104,7 +108,7 @@ static func aplicar_ataque(ataque: Dictionary, atacante: Lutador, alvo: Lutador,
 		"atordoar":
 			alvo.atordoar(float(efeito["valor"]))
 		"empurrar":
-			alvo.empurrar(dir * float(efeito["valor"]))
+			alvo.empurrar(dir * float(efeito["valor"]) * ESCALA_EMPURRAO)
 		"cura":
 			atacante.curar(float(efeito["valor"]))
 		"roubar_carga":

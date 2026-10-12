@@ -1,11 +1,10 @@
 [
-  {"id": "lamina_ardente", "nome": "Lâmina Ardente", "modelo": "espada", "socket": "mao_dir", "cor": "#ff7a3d",
-   "descricao": "+10 de Força e concede o elemento Brasa.",
-   "passivo": {"forca": 10}, "elemento": "brasa"},
-  {"id": "escudo_coral", "nome": "Escudo de Coral", "modelo": "escudo", "socket": "mao_esq", "cor": "#ff6f91",
-   "descricao": "+40 de Energia e reduz 12% do dano recebido.",
-   "passivo": {"energia": 40, "reducao_dano": 0.12}},
-  {"id": "amuleto_vento", "nome": "Amuleto do Vento", "modelo": "amuleto", "socket": "peito", "cor": "#7fd3ff",
-   "descricao": "+15 de Agilidade, +10 de Mente e concede o elemento Tempestade.",
-   "passivo": {"agilidade": 15, "mente": 10}, "elemento": "tempestade"}
+  {"id": "cutelo_brasal", "nome": "Cutelo Brasal", "modelo": "espada", "socket": "mao_dir", "cor": "#ff6338", "descricao": "Lâmina curta de metal poroso mantida permanentemente aquecida.", "passivo": {"forca": 10}, "elemento": "brasa"},
+  {"id": "broquel_cinza", "nome": "Broquel de Cinza", "modelo": "escudo", "socket": "mao_esq", "cor": "#8c382c", "descricao": "Escudo compacto construído com placas resfriadas em camadas.", "passivo": {"animo": 10}, "elemento": "brasa"},
+  {"id": "lamina_fluxo", "nome": "Lâmina de Fluxo", "modelo": "espada", "socket": "mao_dir", "cor": "#45b9dd", "descricao": "Arma curva equilibrada para acompanhar mudanças rápidas de direção.", "passivo": {"agilidade": 9}, "elemento": "mare"},
+  {"id": "concha_memoria", "nome": "Concha da Memória", "modelo": "amuleto", "socket": "peito", "cor": "#bdefff", "descricao": "Relicário nacarado que amplifica padrões mentais repetidos.", "passivo": {"mente": 10}, "elemento": "mare"},
+  {"id": "lamina_basalto", "nome": "Lâmina de Basalto", "modelo": "espada", "socket": "mao_dir", "cor": "#665749", "descricao": "Arma pesada feita para transferir todo o peso do usuário ao impacto.", "passivo": {"forca": 10}, "elemento": "pedra"},
+  {"id": "selo_prismatico", "nome": "Selo Prismático", "modelo": "amuleto", "socket": "peito", "cor": "#9fcde0", "descricao": "Cristal lapidado que estabiliza cálculos de ressonância durante o combate.", "passivo": {"mente": 10}, "elemento": "pedra"},
+  {"id": "sabre_siroco", "nome": "Sabre do Siroco", "modelo": "espada", "socket": "mao_dir", "cor": "#e6bc5a", "descricao": "Lâmina estreita projetada para golpes executados em movimento.", "passivo": {"agilidade": 10}, "elemento": "tempestade"},
+  {"id": "talisma_duna", "nome": "Talismã da Duna", "modelo": "amuleto", "socket": "peito", "cor": "#d4a852", "descricao": "Fragmento mineral polido usado pelos viajantes para manter a concentração sob pressão.", "passivo": {"animo": 10}, "elemento": "pedra"}
 ]

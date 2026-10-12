@@ -2,12 +2,14 @@ extends Node
 ## Autoload "Dados": carrega as cartas (JSON em res://data) e registra os controles.
 ## Para criar uma carta nova basta editar os arquivos JSON — nenhum código precisa mudar.
 
+## Paleta dos elementos (docs/gui-conceito.md). "escura"/"clara" pintam as cartas de Ataque.
 const ELEMENTOS := {
-	"brasa": {"nome": "Brasa", "cor": Color(1.0, 0.45, 0.15)},
-	"tempestade": {"nome": "Tempestade", "cor": Color(0.55, 0.9, 1.0)},
-	"pedra": {"nome": "Pedra", "cor": Color(0.78, 0.6, 0.38)},
-	"mare": {"nome": "Maré", "cor": Color(0.25, 0.55, 1.0)},
+	"brasa": {"nome": "Brasa", "cor": Color("#ff5a2a"), "escura": Color("#5a1410"), "clara": Color("#ffb38a")},
+	"tempestade": {"nome": "Tempestade", "cor": Color("#3fc8f0"), "escura": Color("#0f3446"), "clara": Color("#bff0ff")},
+	"pedra": {"nome": "Pedra", "cor": Color("#d08a3c"), "escura": Color("#3d2410"), "clara": Color("#f0c890")},
+	"mare": {"nome": "Maré", "cor": Color("#2f7fe0"), "escura": Color("#0e2a5c"), "clara": Color("#9fd4ff")},
 }
+const FACCAO_NEUTRA := {"id": "", "nome": "Neutro", "lema": "", "cor": "#8a97ab", "cor_escura": "#1e2936", "cor_clara": "#dfe6f0", "marca": ""}
 const ATRIBUTOS := {"agilidade": "Agilidade", "forca": "Força", "mente": "Mente", "animo": "Ânimo"}
 const ARQUETIPOS := {"projetil": "Projétil", "area": "Área", "investida": "Investida", "salto": "Salto"}
 
@@ -16,6 +18,7 @@ const ORCAMENTO_DECK := 20
 const DECK_MIN := 6
 const DECK_MAX := 10
 
+var faccoes: Dictionary = {}
 var monstros: Dictionary = {}
 var ataques: Dictionary = {}
 var equipamentos: Dictionary = {}
@@ -24,12 +27,14 @@ var locais: Dictionary = {}
 
 
 func _ready() -> void:
+	faccoes = _carregar("res://data/faccoes.json")
 	monstros = _carregar("res://data/monstros.json")
 	ataques = _carregar("res://data/ataques.json")
 	equipamentos = _carregar("res://data/equipamentos.json")
 	canticos = _carregar("res://data/canticos.json")
 	locais = _carregar("res://data/locais.json")
 	_registrar_controles()
+	get_tree().root.theme = Tema.criar_tema()
 
 
 func _carregar(caminho: String) -> Dictionary:
@@ -48,6 +53,34 @@ func cor_elemento(elemento: String) -> Color:
 	if ELEMENTOS.has(elemento):
 		return ELEMENTOS[elemento]["cor"]
 	return Color(0.95, 0.95, 0.95)
+
+
+func faccao(id: String) -> Dictionary:
+	return faccoes.get(id, FACCAO_NEUTRA)
+
+
+## Raio de golpes de Área/Salto: usa "raio" se existir, senão deriva de "tamanho".
+func raio_ataque(atk: Dictionary) -> float:
+	if atk.has("raio"):
+		return float(atk["raio"])
+	var padrao := 4.5 if str(atk.get("arquetipo", "")) == "area" else 3.5
+	if atk.has("tamanho") and float(atk["tamanho"]) > 0.0:
+		return float(atk["tamanho"]) * 2.2
+	return padrao
+
+
+## Velocidade da Investida (m/s). A investida dura Lutador.DURACAO_INVESTIDA segundos.
+func velocidade_investida(atk: Dictionary) -> float:
+	var v := float(atk.get("velocidade", 0))
+	return v if v > 0.0 else 20.0
+
+
+## Elemento principal de um ataque ("" se não tiver bônus elemental).
+func elemento_principal(atk: Dictionary) -> String:
+	var bonus: Dictionary = atk.get("bonus_elemento", {})
+	for el in bonus:
+		return str(el)
+	return ""
 
 
 ## Sugere um deck que combine com os elementos do monstro, respeitando o orçamento.
@@ -91,10 +124,14 @@ func _nota_ataque(atk: Dictionary, elementos_monstro: Array) -> float:
 func gerar_loadout_ia(excluir_monstro: String) -> Dictionary:
 	var opcoes := monstros.keys().filter(func(k): return k != excluir_monstro)
 	var monstro: String = opcoes.pick_random()
+	# Prefere o Cântico da própria facção (ganha +15%), mas às vezes arrisca outro.
+	var fac := str(monstros[monstro].get("faccao", ""))
+	var da_faccao := canticos.keys().filter(func(k): return str(canticos[k].get("faccao", "")) == fac)
+	var cantico_id: String = da_faccao.pick_random() if not da_faccao.is_empty() and randf() < 0.75 else canticos.keys().pick_random()
 	return {
 		"monstro": monstro,
 		"equipamento": equipamentos.keys().pick_random(),
-		"cantico": canticos.keys().pick_random(),
+		"cantico": cantico_id,
 		"deck": deck_sugerido(monstro),
 	}
 

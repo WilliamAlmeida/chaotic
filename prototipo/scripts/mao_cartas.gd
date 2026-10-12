@@ -51,6 +51,18 @@ func usar(i: int, mult_recarga: float) -> String:
 	return id
 
 
+## Diminui a recarga do espaço que está há mais tempo esperando (passivas de recarga).
+func reduzir_maior_recarga(segundos: float) -> void:
+	var escolhido := -1
+	var maior := 0.0
+	for i in TAMANHO:
+		if slots[i] == "" and recarga[i] > maior:
+			maior = recarga[i]
+			escolhido = i
+	if escolhido >= 0:
+		recarga[escolhido] = maxf(0.0, recarga[escolhido] - segundos)
+
+
 func progresso_recarga(i: int) -> float:
 	if slots[i] != "":
 		return 1.0

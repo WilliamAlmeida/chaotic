@@ -207,11 +207,11 @@ func _criar_ambiente() -> void:
 	env.background_mode = Environment.BG_SKY
 	env.sky = ceu
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.8
+	env.ambient_light_energy = 0.45
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.fog_enabled = true
 	env.fog_light_color = horizonte
-	env.fog_density = 0.006
+	env.fog_density = 0.004
 	env.glow_enabled = true
 	env.glow_intensity = 0.5
 	var mundo := WorldEnvironment.new()
@@ -220,7 +220,7 @@ func _criar_ambiente() -> void:
 
 	var sol := DirectionalLight3D.new()
 	sol.light_color = Color(str(local["cor_luz"]))
-	sol.light_energy = 1.1
+	sol.light_energy = 1.25
 	sol.shadow_enabled = true
 	sol.rotation_degrees = Vector3(-50, -35, 0)
 	add_child(sol)
@@ -245,7 +245,7 @@ func _criar_arena() -> void:
 	malha.radial_segments = 64
 	var mi := MeshInstance3D.new()
 	mi.mesh = malha
-	mi.material_override = Efeitos.material(cor_chao)
+	mi.material_override = Efeitos.material_toon(cor_chao, 0.0, false)
 	mi.position.y = -0.5
 	chao.add_child(mi)
 
@@ -256,7 +256,7 @@ func _criar_arena() -> void:
 		bloco.size = Vector3(1.0, 0.8 + 0.6 * absf(sin(i * 1.7)), 1.0)
 		var b := MeshInstance3D.new()
 		b.mesh = bloco
-		b.material_override = Efeitos.material(cor_chao.lightened(0.25))
+		b.material_override = Efeitos.material_toon(cor_chao.lightened(0.25))
 		b.position = Vector3(cos(ang) * 22.0, bloco.size.y / 2.0, sin(ang) * 22.0)
 		b.rotation.y = -ang
 		add_child(b)
@@ -307,27 +307,27 @@ func _criar_obstaculo(pos: Vector3, raio: float, altura: float, estilo: String, 
 		"arvore":
 			tronco.top_radius = raio * 0.6
 			tronco.bottom_radius = raio * 0.8
-			mi.material_override = Efeitos.material(Color(0.4, 0.27, 0.16))
+			mi.material_override = Efeitos.material_toon(Color(0.4, 0.27, 0.16))
 			var copa := SphereMesh.new()
 			copa.radius = raio * 3.0
 			copa.height = raio * 4.5
 			var mc := MeshInstance3D.new()
 			mc.mesh = copa
-			mc.material_override = Efeitos.material(Color(0.22, 0.5, 0.25))
+			mc.material_override = Efeitos.material_toon(Color(0.22, 0.5, 0.25))
 			mc.position.y = altura + raio
 			corpo.add_child(mc)
 		"pilar":
 			tronco.top_radius = raio
 			tronco.bottom_radius = raio
-			mi.material_override = Efeitos.material(Color(0.85, 0.85, 0.8))
+			mi.material_override = Efeitos.material_toon(Color(0.85, 0.85, 0.8))
 			var topo := BoxMesh.new()
 			topo.size = Vector3(raio * 2.6, 0.4, raio * 2.6)
 			var mt := MeshInstance3D.new()
 			mt.mesh = topo
-			mt.material_override = Efeitos.material(Color(0.9, 0.9, 0.85))
+			mt.material_override = Efeitos.material_toon(Color(0.9, 0.9, 0.85))
 			mt.position.y = altura
 			corpo.add_child(mt)
 		_:
 			tronco.top_radius = raio * 0.45
 			tronco.bottom_radius = raio
-			mi.material_override = Efeitos.material(cor_chao.lightened(0.15))
+			mi.material_override = Efeitos.material_toon(cor_chao.lightened(0.15))

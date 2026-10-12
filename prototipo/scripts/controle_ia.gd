@@ -4,7 +4,7 @@ extends Node
 ## prefere cartas cuja condição (Desafio/Teste/Falha) está ativa,
 ## tenta esquivar de projéteis e interrompe o Cântico do oponente.
 
-const ALCANCES := {"projetil": 15.0, "investida": 8.0, "salto": 11.0}
+const ALCANCES := {"projetil": 15.0, "salto": 11.0}
 
 var lutador: Lutador
 var batalha  # Batalha (sem tipo para evitar dependência cíclica entre scripts)
@@ -58,7 +58,12 @@ func _decidir(dist: float) -> void:
 		if e_cura and lutador.energia < lutador.energia_max * 0.45 and dist > 7.0:
 			lutador.iniciar_cantico()
 			return
-		if not e_cura and dist < float(lutador.cantico.get("alcance", 12)) * 0.8 and randf() < 0.25:
+		var tipo_cantico := str(lutador.cantico.get("tipo", ""))
+		if tipo_cantico == "dano" and dist < float(lutador.cantico.get("alcance", 12)) * 0.8 and randf() < 0.25:
+			lutador.iniciar_cantico()
+			return
+		if tipo_cantico == "escudo" and lutador.escudo <= 0.0 and lutador.energia < lutador.energia_max * 0.75 \
+				and dist > 5.0 and randf() < 0.35:
 			lutador.iniciar_cantico()
 			return
 
@@ -86,8 +91,11 @@ func _decidir(dist: float) -> void:
 
 func _alcance(atk: Dictionary) -> float:
 	var tipo := str(atk["arquetipo"])
-	if tipo == "area":
-		return float(atk.get("raio", 4.5)) * 0.85
+	match tipo:
+		"area":
+			return Dados.raio_ataque(atk) * 0.85
+		"investida":
+			return Dados.velocidade_investida(atk) * Lutador.DURACAO_INVESTIDA + 0.5
 	return float(ALCANCES.get(tipo, 3.0))
 
 

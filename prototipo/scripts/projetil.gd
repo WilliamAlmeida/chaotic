@@ -23,7 +23,9 @@ func _ready() -> void:
 	esfera.height = raio * 2.0
 	var mi := MeshInstance3D.new()
 	mi.mesh = esfera
-	mi.material_override = Efeitos.material(cor, 3.0, 1.0, true)
+	var nucleo := Efeitos.material(cor.lightened(0.35), 3.0, 1.0, true)
+	nucleo.next_pass = Efeitos.material_contorno(2.5)
+	mi.material_override = nucleo
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
 	var luz := OmniLight3D.new()
@@ -39,7 +41,7 @@ func _physics_process(delta: float) -> void:
 		queue_free()
 		return
 	var alvo_valido := is_instance_valid(alvo) and alvo.energia > 0.0
-	if alvo_valido and not _desviado:
+	if alvo_valido and not _desviado and alvo.miragem_t <= 0.0:
 		var desejada := (alvo.centro() - global_position).normalized()
 		direcao = direcao.lerp(desejada, clampf(_curva * delta, 0.0, 1.0)).normalized()
 	global_position += direcao * velocidade * delta

@@ -1,0 +1,6 @@
+[
+  {"id": "cinzas", "nome": "Clã das Cinzas", "lema": "Fogo • Renovação • Resistência", "cor": "#d9452b", "cor_escura": "#5a1410", "cor_clara": "#ffb38a", "marca": "chamas"},
+  {"id": "mares", "nome": "Reino das Marés", "lema": "Fluxo • Equilíbrio • Profundidade", "cor": "#2f7fe0", "cor_escura": "#0e2a5c", "cor_clara": "#9fd4ff", "marca": "onda"},
+  {"id": "rocha", "nome": "Colmeia de Rocha", "lema": "Estrutura • Comunidade • Permanência", "cor": "#a8743c", "cor_escura": "#3d2410", "cor_clara": "#f0c890", "marca": "colmeia"},
+  {"id": "areia", "nome": "Nômades da Areia", "lema": "Liberdade • Movimento • Harmonia", "cor": "#e7b928", "cor_escura": "#5a4208", "cor_clara": "#fff0a0", "marca": "sol"}
+]

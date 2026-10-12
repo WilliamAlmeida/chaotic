@@ -1,6 +1,8 @@
 [
-  {"id": "renovacao", "nome": "Canção da Renovação", "tipo": "cura", "valor": 45,
-   "descricao": "Cura 45 de Energia (escala com Mente)."},
-  {"id": "dissonancia", "nome": "Acorde Dissonante", "tipo": "dano", "valor": 24, "atordoar": 1.2, "alcance": 12,
-   "descricao": "Causa 24 de dano e atordoa o inimigo a até 12 m (escala com Mente)."}
+  {"id": "coro_fornalha", "nome": "Coro da Fornalha", "faccao": "cinzas", "tipo": "dano", "valor": 46, "descricao": "Uma cadência crescente concentra agressividade em uma descarga ofensiva."},
+  {"id": "voto_brasa", "nome": "Voto da Brasa Persistente", "faccao": "cinzas", "tipo": "escudo", "valor": 38, "descricao": "O ritmo se torna grave e forma uma camada de calor defensivo ao redor do usuário."},
+  {"id": "cancao_renovacao", "nome": "Canção da Renovação", "faccao": "mares", "tipo": "cura", "valor": 45, "descricao": "Uma sequência fluida recompõe gradualmente a estabilidade energética do Eco."},
+  {"id": "mare_ascendente", "nome": "Métrica da Maré Ascendente", "faccao": "mares", "tipo": "dano", "valor": 42, "descricao": "A ressonância cresce como uma onda e termina em uma descarga concentrada."},
+  {"id": "acorde_monolito", "nome": "Acorde do Monólito", "faccao": "rocha", "tipo": "escudo", "valor": 52, "descricao": "Notas espaçadas sincronizam o Eco com a estabilidade mineral do campo."},
+  {"id": "hino_horizonte", "nome": "Hino do Horizonte Móvel", "faccao": "areia", "tipo": "escudo", "valor": 41, "descricao": "Uma melodia irregular dificulta a leitura do usuário e reforça sua proteção."}
 ]
