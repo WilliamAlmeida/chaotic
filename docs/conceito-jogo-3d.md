@@ -156,6 +156,8 @@ Isso cria decisões táticas em tempo real: *"guardo o golpe caro para quando el
 7. **IA simples** como oponente.
 8. Tela de loadout escolhendo monstro, equipamento, local e ataques.
 
+> ✅ **Protótipo implementado em Godot 4:** veja [`../prototipo/README.md`](../prototipo/README.md).
+
 **Depois do MVP:** mais locais e elementos → tabuleiro 3v3 → deckbuilder com orçamento → exploração e escaneamento → hub e progressão por arenas e chefes → PvP.
 
 ---

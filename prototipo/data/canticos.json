@@ -1,0 +1,6 @@
+[
+  {"id": "renovacao", "nome": "Canção da Renovação", "tipo": "cura", "valor": 45,
+   "descricao": "Cura 45 de Energia (escala com Mente)."},
+  {"id": "dissonancia", "nome": "Acorde Dissonante", "tipo": "dano", "valor": 24, "atordoar": 1.2, "alcance": 12,
+   "descricao": "Causa 24 de dano e atordoa o inimigo a até 12 m (escala com Mente)."}
+]

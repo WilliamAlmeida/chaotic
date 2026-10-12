@@ -1,0 +1,44 @@
+[
+  {
+    "id": "brasario",
+    "nome": "Brasário",
+    "descricao": "Predador ágil das encostas vulcânicas. Rápido e agressivo.",
+    "forma": "agil",
+    "cor": "#e8632b",
+    "cor_detalhe": "#ffd166",
+    "escala": 1.0,
+    "atributos": {"agilidade": 80, "forca": 50, "mente": 45, "animo": 65},
+    "energia": 275,
+    "elementos": ["brasa", "tempestade"],
+    "cargas_cantico": 2,
+    "passiva": {"tipo": "furia", "descricao": "Fúria: abaixo de 40% de Energia causa +30% de dano."}
+  },
+  {
+    "id": "rochedo",
+    "nome": "Rochedo",
+    "descricao": "Colosso de pedra e magma. Lento, mas cada golpe pesa.",
+    "forma": "robusto",
+    "cor": "#8d6e4a",
+    "cor_detalhe": "#ff8a3d",
+    "escala": 1.2,
+    "atributos": {"agilidade": 35, "forca": 85, "mente": 50, "animo": 60},
+    "energia": 265,
+    "elementos": ["pedra", "brasa"],
+    "cargas_cantico": 1,
+    "passiva": {"tipo": "pele_rocha", "descricao": "Pele de Rocha: recebe 2 de dano a menos em cada golpe."}
+  },
+  {
+    "id": "ondina",
+    "nome": "Ondina",
+    "descricao": "Espírito das marés que flutua sobre a água. Mestra dos Cânticos.",
+    "forma": "mistico",
+    "cor": "#3a7bd5",
+    "cor_detalhe": "#9be7ff",
+    "escala": 1.0,
+    "atributos": {"agilidade": 65, "forca": 40, "mente": 85, "animo": 50},
+    "energia": 300,
+    "elementos": ["mare", "tempestade"],
+    "cargas_cantico": 3,
+    "passiva": {"tipo": "fluxo", "descricao": "Fluxo Vital: regenera 2 de Energia por segundo."}
+  }
+]

@@ -1,0 +1,11 @@
+[
+  {"id": "lamina_ardente", "nome": "Lâmina Ardente", "modelo": "espada", "socket": "mao_dir", "cor": "#ff7a3d",
+   "descricao": "+10 de Força e concede o elemento Brasa.",
+   "passivo": {"forca": 10}, "elemento": "brasa"},
+  {"id": "escudo_coral", "nome": "Escudo de Coral", "modelo": "escudo", "socket": "mao_esq", "cor": "#ff6f91",
+   "descricao": "+40 de Energia e reduz 12% do dano recebido.",
+   "passivo": {"energia": 40, "reducao_dano": 0.12}},
+  {"id": "amuleto_vento", "nome": "Amuleto do Vento", "modelo": "amuleto", "socket": "peito", "cor": "#7fd3ff",
+   "descricao": "+15 de Agilidade, +10 de Mente e concede o elemento Tempestade.",
+   "passivo": {"agilidade": 15, "mente": 10}, "elemento": "tempestade"}
+]
