@@ -4,16 +4,23 @@ Pipeline de rig automático para modelos humanoides gerados por IA (ex.: Hunyuan
 Uso (Blender como módulo Python, `pip install bpy`):
     python riggar_modelo.py <entrada.glb> <referencia.png|webp> <saida.glb>
 
+O modelo de entrada deve estar em pose T (braços abertos na horizontal, sem encostar no
+corpo): assim os pesos dos braços saem limpos, sem "pontes" de malha entre braço e tronco.
+
 O que faz:
   1. Carrega a malha (só geometria), centraliza no quadril e põe os pés em y = 0.
-  2. Pinta cores de vértice projetando a imagem de referência pela frente;
-     a parte de trás da cabeça/costas vira cabelo.
-  3. Cria um esqueleto humanoide + cauda nas posições das articulações (JUNTAS).
-  4. Pesos de pele automáticos (difusão de calor do Blender); o cabelo é preso à cabeça/peito.
-  5. Cria as animações usadas pelo jogo e exporta GLB (malha + esqueleto + animações).
+  2. Cria um esqueleto humanoide + cauda nas posições das articulações (JUNTAS).
+  3. Pesos de pele automáticos (difusão de calor do Blender), limitados a um tubo em volta
+     de cada braço.
+  4. Abaixa os braços (pose T -> pose A) e grava essa pose como a pose de repouso, que é a
+     que as animações e o jogo esperam.
+  5. Pinta cores de vértice projetando a imagem de referência pela frente;
+     a parte de trás da cabeça/costas vira cabelo, preso à cabeça/peito.
+  6. Cria as animações usadas pelo jogo e exporta GLB (malha + esqueleto + animações).
 
 As coordenadas de JUNTAS estão no espaço do glTF original (Y para cima, frente em +Z) e
-foram medidas numa vista ortográfica com grade. Para outro modelo, meça e troque a tabela.
+foram medidas por fatias da malha e numa vista ortográfica com grade. Para outro modelo,
+meça e troque a tabela.
 """
 import math
 import sys
@@ -27,34 +34,39 @@ from PIL import Image
 ENTRADA, REFERENCIA, SAIDA = sys.argv[-3:]
 
 # Centro do quadril (x, z) e chão (y) no espaço do glTF original.
-CENTRO_X, CENTRO_Z, CHAO_Y = -0.07, 0.19, -0.997
+CENTRO_X, CENTRO_Z, CHAO_Y = -0.05, 0.20, -1.0004
 
 # (nome, cabeça, cauda, pai) — coordenadas glTF: (x, y, z), frente = +z, esquerda do personagem = +x.
+# Pose T: braços na horizontal em y ~ 0.6.
 JUNTAS = [
-    ("Hips", (-0.07, -0.06, 0.19), (-0.07, 0.10, 0.18), None),
-    ("Spine", (-0.07, 0.10, 0.18), (-0.07, 0.28, 0.18), "Hips"),
-    ("Chest", (-0.07, 0.28, 0.18), (-0.07, 0.50, 0.17), "Spine"),
-    ("Neck", (-0.07, 0.52, 0.17), (-0.08, 0.66, 0.19), "Chest"),
-    ("Head", (-0.08, 0.66, 0.19), (-0.08, 0.95, 0.20), "Neck"),
-    ("Shoulder.R", (-0.12, 0.50, 0.17), (-0.28, 0.52, 0.17), "Chest"),
-    ("UpperArm.R", (-0.28, 0.52, 0.17), (-0.37, 0.20, 0.17), "Shoulder.R"),
-    ("Forearm.R", (-0.37, 0.20, 0.17), (-0.40, -0.04, 0.23), "UpperArm.R"),
-    ("Hand.R", (-0.40, -0.04, 0.23), (-0.41, -0.18, 0.25), "Forearm.R"),
-    ("Shoulder.L", (-0.02, 0.50, 0.17), (0.14, 0.52, 0.17), "Chest"),
-    ("UpperArm.L", (0.14, 0.52, 0.17), (0.22, 0.22, 0.17), "Shoulder.L"),
-    ("Forearm.L", (0.22, 0.22, 0.17), (0.19, -0.01, 0.24), "UpperArm.L"),
-    ("Hand.L", (0.19, -0.01, 0.24), (0.18, -0.12, 0.26), "Forearm.L"),
-    ("Thigh.R", (-0.19, -0.08, 0.18), (-0.26, -0.45, 0.21), "Hips"),
-    ("Shin.R", (-0.26, -0.45, 0.21), (-0.29, -0.85, 0.16), "Thigh.R"),
-    ("Foot.R", (-0.29, -0.85, 0.16), (-0.31, -0.97, 0.38), "Shin.R"),
-    ("Thigh.L", (0.04, -0.08, 0.18), (0.11, -0.45, 0.21), "Hips"),
-    ("Shin.L", (0.11, -0.45, 0.21), (0.16, -0.85, 0.16), "Thigh.L"),
-    ("Foot.L", (0.16, -0.85, 0.16), (0.19, -0.97, 0.38), "Shin.L"),
+    ("Hips", (-0.05, 0.02, 0.20), (-0.05, 0.16, 0.19), None),
+    ("Spine", (-0.05, 0.16, 0.19), (-0.05, 0.32, 0.19), "Hips"),
+    ("Chest", (-0.05, 0.32, 0.19), (-0.05, 0.56, 0.18), "Spine"),
+    ("Neck", (-0.05, 0.58, 0.17), (-0.045, 0.70, 0.18), "Chest"),
+    ("Head", (-0.045, 0.70, 0.18), (-0.04, 0.97, 0.20), "Neck"),
+    ("Shoulder.R", (-0.10, 0.57, 0.18), (-0.25, 0.60, 0.18), "Chest"),
+    ("UpperArm.R", (-0.25, 0.60, 0.18), (-0.49, 0.585, 0.185), "Shoulder.R"),
+    ("Forearm.R", (-0.49, 0.585, 0.185), (-0.72, 0.575, 0.205), "UpperArm.R"),
+    ("Hand.R", (-0.72, 0.575, 0.205), (-0.86, 0.575, 0.20), "Forearm.R"),
+    ("Shoulder.L", (0.00, 0.57, 0.18), (0.15, 0.60, 0.18), "Chest"),
+    ("UpperArm.L", (0.15, 0.60, 0.18), (0.39, 0.588, 0.185), "Shoulder.L"),
+    ("Forearm.L", (0.39, 0.588, 0.185), (0.62, 0.58, 0.20), "UpperArm.L"),
+    ("Hand.L", (0.62, 0.58, 0.20), (0.79, 0.575, 0.19), "Forearm.L"),
+    ("Thigh.R", (-0.16, 0.00, 0.20), (-0.26, -0.45, 0.19), "Hips"),
+    ("Shin.R", (-0.26, -0.45, 0.19), (-0.30, -0.85, 0.17), "Thigh.R"),
+    ("Foot.R", (-0.30, -0.85, 0.17), (-0.32, -0.97, 0.42), "Shin.R"),
+    ("Thigh.L", (0.06, 0.00, 0.20), (0.19, -0.45, 0.19), "Hips"),
+    ("Shin.L", (0.19, -0.45, 0.19), (0.23, -0.85, 0.17), "Thigh.L"),
+    ("Foot.L", (0.23, -0.85, 0.17), (0.24, -0.97, 0.42), "Shin.L"),
 ]
-CAUDA = [(-0.08, -0.10, 0.06), (-0.11, -0.35, 0.03), (-0.10, -0.60, -0.03), (-0.02, -0.85, -0.15),
-         (0.15, -0.93, -0.30), (0.30, -0.78, -0.40), (0.38, -0.88, -0.48)]
-for i in range(len(CAUDA) - 1):
+# Linha central da cauda (medida por distância geodésica ao longo da malha a partir da raiz).
+CAUDA = [(0.00, 0.07, 0.07), (0.03, -0.14, 0.00), (0.04, -0.38, -0.01), (0.09, -0.60, -0.11),
+         (0.22, -0.71, -0.30), (0.36, -0.555, -0.46), (0.53, -0.47, -0.50), (0.58, -0.64, -0.44)]
+N_CAUDA = len(CAUDA) - 1
+for i in range(N_CAUDA):
     JUNTAS.append((f"Tail{i + 1}", CAUDA[i], CAUDA[i + 1], "Hips" if i == 0 else f"Tail{i}"))
+# Pose T -> pose A: quanto cada braço desce (graus) antes de virar a pose de repouso.
+DESCIDA_BRACO = 72.0
 
 FPS = 30
 
@@ -113,98 +125,7 @@ for p in malha.polygons:
 print("vertices:", len(malha.vertices), "triangulos:", len(malha.polygons))
 
 # ---------------------------------------------------------------------------
-# 2. Cores (projeção frontal da referência + cabelo atrás)
-# ---------------------------------------------------------------------------
-n_v = len(malha.vertices)
-co = np.zeros(n_v * 3)
-malha.vertices.foreach_get("co", co)
-co = co.reshape(-1, 3)
-nor = np.zeros(n_v * 3)
-malha.vertices.foreach_get("normal", nor)
-nor = nor.reshape(-1, 3)
-# De volta ao espaço glTF para projetar: gx = bx + cx, gy = bz + chao, gz = -by + cz
-gx = co[:, 0] + CENTRO_X
-gy = co[:, 2] + CHAO_Y
-nz_frente = -nor[:, 1]  # normal apontando para a frente (+z glTF = -y Blender)
-
-img = np.asarray(Image.open(REFERENCIA).convert("RGB")).astype(np.float64) / 255.0
-alt_img, larg_img = img.shape[:2]
-fundo = np.median(np.concatenate([img[0], img[-1], img[:, 0], img[:, -1]]), axis=0)
-mascara = np.linalg.norm(img - fundo, axis=2) > 60.0 / 255.0
-# Preenche o fundo com a cor do primeiro plano mais próxima (evita "vazar" cinza nas bordas).
-preenchida = img.copy()
-conhecido = mascara.copy()
-for _ in range(25):
-    soma = np.zeros_like(preenchida)
-    cont = np.zeros(mascara.shape)
-    for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-        desl_c = np.roll(conhecido, (dy, dx), axis=(0, 1))
-        desl_i = np.roll(preenchida, (dy, dx), axis=(0, 1))
-        soma += desl_i * desl_c[..., None]
-        cont += desl_c
-    novos = (~conhecido) & (cont > 0)
-    preenchida[novos] = soma[novos] / cont[novos][:, None]
-    conhecido |= novos
-
-# Mapeamento vertical: topo/base da silhueta. Horizontal: ajuste linear das bordas por linha.
-linhas = np.where(mascara.sum(1) > 2)[0]
-topo_img, base_img = linhas.min(), linhas.max()
-gy_max, gy_min = gy.max(), gy.min()
-
-
-def linha_img(y):
-    return topo_img + (gy_max - y) / (gy_max - gy_min) * (base_img - topo_img)
-
-
-pares_x, pares_img = [], []
-for y in np.linspace(gy_min + 0.75 * (gy_max - gy_min), gy_min + 0.95 * (gy_max - gy_min), 25):
-    faixa = (np.abs(gy - y) < 0.015) & (nz_frente > 0.0)
-    if faixa.sum() < 5:
-        continue
-    li = int(round(linha_img(y)))
-    cols = np.where(mascara[li])[0]
-    if len(cols) < 3:
-        continue
-    pares_x += [gx[faixa].min(), gx[faixa].max()]
-    pares_img += [cols.min(), cols.max()]
-a, b = np.polyfit(pares_x, pares_img, 1)
-print("ajuste horizontal: px = %.1f * x + %.1f" % (a, b))
-
-u = np.clip(np.round(a * gx + b), 0, larg_img - 1).astype(int)
-v = np.clip(np.round(linha_img(gy)), 0, alt_img - 1).astype(int)
-cores = preenchida[v, u]
-
-CABELO = np.array([0.80, 0.20, 0.10])
-# Atrás da cabeça e nas costas até a cintura: cabelo (a referência só mostra a frente).
-costas = nz_frente < -0.25
-centro_tronco = np.abs(gx - CENTRO_X) < 0.27
-eh_cabelo = costas & (((gy > 0.20) & centro_tronco) | (gy > 0.62))
-orelha = gy > 0.88
-eh_cabelo &= ~orelha
-cores[eh_cabelo] = CABELO * (0.85 + 0.15 * np.clip(-nz_frente[eh_cabelo], 0, 1))[:, None]
-# Classificação de cabelo também pela cor (vermelho forte), para os pesos.
-r, g = cores[:, 0], cores[:, 1]
-eh_cabelo |= (r > 0.45) & (g / np.maximum(r, 1e-3) < 0.38) & (gy > 0.15)
-
-# Realça a saturação (visual de anime) e grava como atributo de cor por vértice (sRGB).
-cinza = cores.mean(1, keepdims=True)
-cores = np.clip(cinza + (cores - cinza) * 1.1, 0, 1)
-atributo = malha.color_attributes.new("Col", "BYTE_COLOR", "POINT")
-rgba = np.concatenate([cores, np.ones((n_v, 1))], axis=1)
-atributo.data.foreach_set("color_srgb", rgba.ravel())
-
-mat = bpy.data.materials.new("Pele")
-mat.use_nodes = True
-nos = mat.node_tree.nodes
-bsdf = nos.get("Principled BSDF")
-attr_no = nos.new("ShaderNodeVertexColor")
-attr_no.layer_name = "Col"
-mat.node_tree.links.new(attr_no.outputs["Color"], bsdf.inputs["Base Color"])
-bsdf.inputs["Roughness"].default_value = 0.9
-corpo.data.materials.append(mat)
-
-# ---------------------------------------------------------------------------
-# 3. Esqueleto
+# 2. Esqueleto
 # ---------------------------------------------------------------------------
 arm_dados = bpy.data.armatures.new("Esqueleto")
 arm = bpy.data.objects.new("Esqueleto", arm_dados)
@@ -223,7 +144,7 @@ for nome, cabeca, cauda, pai in JUNTAS:
 bpy.ops.object.mode_set(mode="OBJECT")
 
 # ---------------------------------------------------------------------------
-# 4. Pesos automáticos
+# 3. Pesos automáticos
 # ---------------------------------------------------------------------------
 bpy.ops.object.select_all(action="DESELECT")
 corpo.select_set(True)
@@ -231,9 +152,9 @@ arm.select_set(True)
 bpy.context.view_layer.objects.active = arm
 bpy.ops.object.parent_set(type="ARMATURE_AUTO")
 grupos = {g.name: g for g in corpo.vertex_groups}
-# Limpeza geométrica dos braços: no modelo original os punhos encostam nas coxas e os
-# braços ficam colados ao tronco, então o calor "vaza". Cada braço só pode influenciar
-# vértices dentro de um tubo em volta dos seus ossos; dentro do tubo, o braço manda.
+# Limpeza dos braços: o calor ainda "vaza" para os cachos de cabelo ao lado dos ombros.
+# Cada braço só pode influenciar vértices dentro de um tubo em volta dos seus ossos;
+# dentro do tubo, o braço manda.
 segmentos = {nome: (para_blender(c), para_blender(t)) for nome, c, t, _ in JUNTAS}
 
 
@@ -252,8 +173,8 @@ d_corpo = np.min([dist[n] for n in OSSOS_CORPO], axis=0)
 for lado in ("R", "L"):
     braco = [f"UpperArm.{lado}", f"Forearm.{lado}", f"Hand.{lado}"]
     d_braco = np.min([dist[n] for n in braco], axis=0)
-    fora = np.where((d_braco > 0.10) | (d_braco > d_corpo * 0.85))[0].tolist()
-    dentro = np.where((d_braco < 0.075) & (d_braco < d_corpo * 0.7))[0].tolist()
+    fora = np.where((d_braco > 0.09) | (d_braco > d_corpo * 0.85))[0].tolist()
+    dentro = np.where((d_braco < 0.065) & (d_braco < d_corpo * 0.7))[0].tolist()
     for nome in braco:
         grupos[nome].remove(fora)
     for nome in OSSOS_CORPO + [f"Shoulder.{lado}"]:
@@ -266,65 +187,6 @@ for lado in ("R", "L"):
 sem_peso = sum(1 for vt in malha.vertices if len(vt.groups) == 0)
 print("vertices sem peso apos calor:", sem_peso)
 
-# Cabelo segue cabeça/peito (senão os cachos laterais acompanham os braços).
-idx_cabelo = np.where(eh_cabelo)[0].tolist()
-for nome in grupos:
-    grupos[nome].remove(idx_cabelo)
-alto = [i for i in idx_cabelo if gy[i] >= 0.62]
-baixo = [i for i in idx_cabelo if gy[i] < 0.62]
-grupos["Head"].add(alto, 1.0, "REPLACE")
-grupos["Chest"].add(baixo, 1.0, "REPLACE")
-
-# Corta as "pontes" de malha entre braço e corpo (pulso encostado na coxa, braço colado
-# ao tronco): triângulos que misturam vértices do braço com vértices do corpo, longe do
-# ombro, são removidos. Sem isso eles esticam como paredes quando o braço se move.
-def classe_vertice(vt):
-    melhor, peso = "corpo", 0.0
-    for g in vt.groups:
-        nome = corpo.vertex_groups[g.group].name
-        if g.weight > peso:
-            peso = g.weight
-            melhor = ("braco_" + nome[-1]) if nome.startswith(("UpperArm", "Forearm", "Hand")) else "corpo"
-    return melhor
-
-
-ombros = {lado: np.array(para_blender(c)) for nome, c, _, _ in JUNTAS for lado in ("R", "L") if nome == f"UpperArm.{lado}"}
-# Fora da região do ombro, cada vértice pertence inteiro ao braço ou inteiro ao corpo
-# (peso dividido faz o vértice andar "pela metade" e esticar a malha).
-nomes_grupos = [g.name for g in corpo.vertex_groups]
-for vt in malha.vertices:
-    p = np.array(vt.co[:])
-    if min(np.linalg.norm(p - ombros[l]) for l in ombros) < 0.13:
-        continue
-    peso_braco = sum(g.weight for g in vt.groups if nomes_grupos[g.group].startswith(("UpperArm", "Forearm", "Hand")))
-    peso_resto = sum(g.weight for g in vt.groups) - peso_braco
-    if peso_braco == 0.0 or peso_resto == 0.0:
-        continue
-    manter_braco = peso_braco >= peso_resto
-    for g in list(vt.groups):
-        eh_braco = nomes_grupos[g.group].startswith(("UpperArm", "Forearm", "Hand"))
-        if eh_braco != manter_braco:
-            corpo.vertex_groups[g.group].remove([vt.index])
-classes = [classe_vertice(vt) for vt in malha.vertices]
-bm = bmesh.new()
-bm.from_mesh(malha)
-bm.faces.ensure_lookup_table()
-remover = []
-for f in bm.faces:
-    cls = {classes[v.index] for v in f.verts}
-    if len(cls) < 2:
-        continue
-    centro = np.array(f.calc_center_median()[:])
-    perto_ombro = any(np.linalg.norm(centro - ombros[lado]) < 0.13 for lado in ombros)
-    if not perto_ombro:
-        remover.append(f)
-bmesh.ops.delete(bm, geom=remover, context="FACES_ONLY")
-# Obs.: não preenchemos os buracos — cada contorno mistura braço e corpo e recriaria a ponte.
-# Os buracos ficam nos pontos de contato (escondidos atrás do braço na maior parte do tempo).
-bm.to_mesh(malha)
-bm.free()
-print("triangulos de ponte removidos:", len(remover))
-
 # Vértices que ficaram sem peso: osso mais próximo (fora dos braços).
 candidatos = [n for n in segmentos if not n.startswith(("UpperArm", "Forearm", "Hand"))]
 for vt in malha.vertices:
@@ -332,8 +194,148 @@ for vt in malha.vertices:
         mais_perto = min(candidatos, key=lambda n: dist[n][vt.index])
         grupos[mais_perto].add([vt.index], 1.0, "REPLACE")
 
+d_bracos = np.min([dist[n] for n in segmentos if n.startswith(("UpperArm", "Forearm", "Hand"))], axis=0)
+
 # ---------------------------------------------------------------------------
-# 5. Animações
+# 3b. Cores de um modelo já pintado (opcional), ainda na pose T
+# ---------------------------------------------------------------------------
+USAR_MODELO = REFERENCIA.lower().endswith(".glb")
+# Ossos "seguintes" (definem a direção de cada osso a partir das cabeças).
+SEGUINTE = {"Hips": "Spine", "Spine": "Chest", "Chest": "Neck", "Neck": "Head"}
+for lado in ("R", "L"):
+    SEGUINTE.update({f"Shoulder.{lado}": f"UpperArm.{lado}", f"UpperArm.{lado}": f"Forearm.{lado}",
+                     f"Forearm.{lado}": f"Hand.{lado}", f"Thigh.{lado}": f"Shin.{lado}", f"Shin.{lado}": f"Foot.{lado}"})
+
+
+def classe_osso(nome):
+    if nome.startswith(("UpperArm", "Forearm", "Hand")):
+        return "braco_" + nome[-1]
+    return "cauda" if nome.startswith("Tail") else "corpo"
+
+
+def direcoes(cabecas, pais, n_cauda):
+    """Direção de cada osso: até a cabeça do osso seguinte; nas pontas, a do pai.
+    Devolve {osso: (vetor, é_ponta)}."""
+    seguinte = dict(SEGUINTE)
+    seguinte.update({f"Tail{i}": f"Tail{i + 1}" for i in range(1, n_cauda)})
+    dirs = {}
+    for nome in cabecas:
+        if nome in seguinte and seguinte[nome] in cabecas:
+            dirs[nome] = (cabecas[seguinte[nome]] - cabecas[nome], False)
+    for nome in cabecas:
+        if nome not in dirs:
+            vetor = cabecas[nome] - cabecas[pais[nome]] if pais.get(nome) else np.array([0.0, 1.0, 0.0])
+            dirs[nome] = (vetor, True)
+    return dirs
+
+
+def rotacao_entre(a, b):
+    """Matriz da menor rotação que leva a direção a até b."""
+    a = a / np.linalg.norm(a)
+    b = b / np.linalg.norm(b)
+    v = np.cross(a, b)
+    c = float(a @ b)
+    if np.linalg.norm(v) < 1e-8:
+        return np.eye(3)
+    vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+    return np.eye(3) + vx + vx @ vx / (1 + c)
+
+
+def ler_glb_riggado(caminho):
+    """Posições, cores (sRGB), osso dominante e cabeças dos ossos de um GLB exportado por este script."""
+    import json, struct
+    dados = open(caminho, "rb").read()
+    tam_json = struct.unpack("<I", dados[12:16])[0]
+    js = json.loads(dados[20:20 + tam_json])
+    ini = 20 + tam_json
+    binario = dados[ini + 8:ini + 8 + struct.unpack("<I", dados[ini:ini + 4])[0]]
+
+    def acessor(i):
+        a = js["accessors"][i]
+        bv = js["bufferViews"][a["bufferView"]]
+        off = bv.get("byteOffset", 0) + a.get("byteOffset", 0)
+        tipo = {5121: np.uint8, 5123: np.uint16, 5125: np.uint32, 5126: np.float32}[a["componentType"]]
+        n = {"SCALAR": 1, "VEC3": 3, "VEC4": 4, "MAT4": 16}[a["type"]]
+        return np.frombuffer(binario, dtype=tipo, count=a["count"] * n, offset=off).reshape(a["count"], n)
+
+    prim = js["meshes"][0]["primitives"][0]["attributes"]
+    pele = js["skins"][0]
+    nomes = [js["nodes"][j]["name"] for j in pele["joints"]]
+    ibm = acessor(pele["inverseBindMatrices"]).reshape(-1, 4, 4).transpose(0, 2, 1)
+    cabecas = {nome: np.linalg.inv(m)[:3, 3] for nome, m in zip(nomes, ibm)}
+    pais = {}
+    for j in pele["joints"]:
+        for filho in js["nodes"][j].get("children", []):
+            pais[js["nodes"][filho]["name"]] = js["nodes"][j]["name"]
+    cor = acessor(prim["COLOR_0"])[:, :3].astype(np.float64)
+    cor = np.where(cor <= 0.0031308, cor * 12.92, 1.055 * np.power(np.clip(cor, 0, 1), 1 / 2.4) - 0.055)
+    juntas = acessor(prim["JOINTS_0"])
+    pesos = acessor(prim["WEIGHTS_0"])
+    dominante = np.array(nomes)[juntas[np.arange(len(juntas)), pesos.argmax(1)]]
+    return acessor(prim["POSITION"]).astype(np.float64), cor, dominante, cabecas, pais
+
+
+def cores_por_modelo(caminho):
+    """Copia a pintura de outro modelo riggado da mesma personagem (mesmos nomes de ossos).
+
+    Cada vértice é levado para o espaço do outro modelo pelo seu osso dominante (posição em
+    relação à cabeça do osso, girada para a direção que o osso tem lá) e pega a cor do vértice
+    mais próximo que pertence à mesma região (braço direito, braço esquerdo, cauda ou corpo)."""
+    from mathutils.kdtree import KDTree
+    pos_v, cor_v, dom_v, cab_v, pais_v = ler_glb_riggado(caminho)
+    n_cauda_v = sum(1 for n in cab_v if n.startswith("Tail"))
+    # Este modelo, no mesmo espaço do GLB exportado (Y para cima, quadril em x=z=0, pés em y=0).
+    def para_glb(v):
+        return np.array([v[0], v[2], -v[1]])
+    cab_n = {nome: para_glb(para_blender(c)) for nome, c, _, _ in JUNTAS}
+    pais_n = {nome: pai for nome, _, _, pai in JUNTAS}
+    pos_n = np.array([para_glb(vt.co) for vt in malha.vertices])
+    dom_n = []
+    for vt in malha.vertices:
+        g = max(vt.groups, key=lambda g: g.weight, default=None)
+        dom_n.append(corpo.vertex_groups[g.group].name if g else "Hips")
+    dir_v = direcoes(cab_v, pais_v, n_cauda_v)
+    dir_n = direcoes(cab_n, pais_n, N_CAUDA)
+    arvores = {}
+    for cls in ("braco_R", "braco_L", "cauda", "corpo"):
+        idx = np.where([classe_osso(n) == cls for n in dom_v])[0]
+        arvore = KDTree(len(idx))
+        for k, i in enumerate(idx):
+            arvore.insert(pos_v[i], k)
+        arvore.balance()
+        arvores[cls] = (arvore, idx)
+    cores_saida = np.zeros((len(pos_n), 3))
+    for nome in cab_n:
+        # Cauda com número diferente de ossos: usa o osso na mesma fração do comprimento.
+        alvo = nome
+        if nome.startswith("Tail"):
+            alvo = f"Tail{min(n_cauda_v, max(1, round(int(nome[4:]) * n_cauda_v / N_CAUDA)))}"
+        if alvo not in cab_v:
+            continue
+        sel = np.where(np.array(dom_n) == nome)[0]
+        if len(sel) == 0:
+            continue
+        (vet_n, ponta), (vet_v, _) = dir_n[nome], dir_v[alvo]
+        rot = rotacao_entre(vet_n, vet_v)
+        # Estica só ao longo do osso (comprimentos diferentes); a grossura fica igual.
+        escala = 1.0 if ponta else np.linalg.norm(vet_v) / max(np.linalg.norm(vet_n), 1e-6)
+        eixo = vet_n / np.linalg.norm(vet_n)
+        rel = pos_n[sel] - cab_n[nome]
+        ao_longo = (rel @ eixo)[:, None] * eixo
+        estimadas = cab_v[alvo] + (rel + (escala - 1.0) * ao_longo) @ rot.T
+        arvore, idx = arvores[classe_osso(nome)]
+        for i, p in zip(sel, estimadas):
+            _, k, _ = arvore.find(p)
+            cores_saida[i] = cor_v[idx[k]]
+    return cores_saida
+
+
+if USAR_MODELO:
+    cores_modelo = cores_por_modelo(REFERENCIA)
+    print("cores copiadas de", REFERENCIA)
+
+# ---------------------------------------------------------------------------
+# 4. Pose T -> pose A (vira a pose de repouso)
 # ---------------------------------------------------------------------------
 pose = arm.pose
 for pb in pose.bones:
@@ -351,6 +353,139 @@ def rot_mundo(nome, eixo, graus):
     return Quaternion(eixo_local, math.radians(graus))
 
 
+pose.bones["UpperArm.R"].rotation_quaternion = rot_mundo("UpperArm.R", Y, -DESCIDA_BRACO)
+pose.bones["UpperArm.L"].rotation_quaternion = rot_mundo("UpperArm.L", Y, DESCIDA_BRACO)
+# Cotovelo levemente dobrado para a frente, como numa pose relaxada.
+pose.bones["Forearm.R"].rotation_quaternion = rot_mundo("Forearm.R", X, -8)
+pose.bones["Forearm.L"].rotation_quaternion = rot_mundo("Forearm.L", X, -8)
+bpy.context.view_layer.update()
+bpy.ops.object.select_all(action="DESELECT")
+bpy.context.view_layer.objects.active = corpo
+corpo.select_set(True)
+nome_mod = next(m.name for m in corpo.modifiers if m.type == "ARMATURE")
+bpy.ops.object.modifier_apply(modifier=nome_mod)
+corpo.select_set(False)
+bpy.context.view_layer.objects.active = arm
+arm.select_set(True)
+bpy.ops.object.mode_set(mode="POSE")
+bpy.ops.pose.armature_apply(selected=False)
+bpy.ops.object.mode_set(mode="OBJECT")
+mod = corpo.modifiers.new("Armature", "ARMATURE")
+mod.object = arm
+for pb in pose.bones:
+    pb.rotation_quaternion = Quaternion()
+
+# ---------------------------------------------------------------------------
+# 5. Cores (pintura copiada de outro modelo ou projeção da referência), já na pose A
+# ---------------------------------------------------------------------------
+n_v = len(malha.vertices)
+co = np.zeros(n_v * 3)
+malha.vertices.foreach_get("co", co)
+co = co.reshape(-1, 3)
+nor = np.zeros(n_v * 3)
+malha.vertices.foreach_get("normal", nor)
+nor = nor.reshape(-1, 3)
+# De volta ao espaço glTF para projetar: gx = bx + cx, gy = bz + chao, gz = -by + cz
+gx = co[:, 0] + CENTRO_X
+gy = co[:, 2] + CHAO_Y
+nz_frente = -nor[:, 1]  # normal apontando para a frente (+z glTF = -y Blender)
+
+
+def cores_por_referencia(caminho):
+    """Projeta a imagem de referência pela frente; atrás da cabeça e nas costas vira cabelo."""
+    img = np.asarray(Image.open(caminho).convert("RGB")).astype(np.float64) / 255.0
+    alt_img, larg_img = img.shape[:2]
+    fundo = np.median(np.concatenate([img[0], img[-1], img[:, 0], img[:, -1]]), axis=0)
+    mascara = np.linalg.norm(img - fundo, axis=2) > 60.0 / 255.0
+    # Preenche o fundo com a cor do primeiro plano mais próxima (evita "vazar" cinza nas bordas).
+    preenchida = img.copy()
+    conhecido = mascara.copy()
+    for _ in range(25):
+        soma = np.zeros_like(preenchida)
+        cont = np.zeros(mascara.shape)
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            desl_c = np.roll(conhecido, (dy, dx), axis=(0, 1))
+            desl_i = np.roll(preenchida, (dy, dx), axis=(0, 1))
+            soma += desl_i * desl_c[..., None]
+            cont += desl_c
+        novos = (~conhecido) & (cont > 0)
+        preenchida[novos] = soma[novos] / cont[novos][:, None]
+        conhecido |= novos
+
+    # Mapeamento vertical: topo/base da silhueta. Horizontal: ajuste linear das bordas por linha.
+    linhas = np.where(mascara.sum(1) > 2)[0]
+    topo_img, base_img = linhas.min(), linhas.max()
+    gy_max, gy_min = gy.max(), gy.min()
+
+    def linha_img(y):
+        return topo_img + (gy_max - y) / (gy_max - gy_min) * (base_img - topo_img)
+
+    pares_x, pares_img = [], []
+    for y in np.linspace(gy_min + 0.75 * (gy_max - gy_min), gy_min + 0.95 * (gy_max - gy_min), 25):
+        faixa = (np.abs(gy - y) < 0.015) & (nz_frente > 0.0)
+        if faixa.sum() < 5:
+            continue
+        li = int(round(linha_img(y)))
+        cols = np.where(mascara[li])[0]
+        if len(cols) < 3:
+            continue
+        pares_x += [gx[faixa].min(), gx[faixa].max()]
+        pares_img += [cols.min(), cols.max()]
+    a, b = np.polyfit(pares_x, pares_img, 1)
+    print("ajuste horizontal: px = %.1f * x + %.1f" % (a, b))
+
+    u = np.clip(np.round(a * gx + b), 0, larg_img - 1).astype(int)
+    v = np.clip(np.round(linha_img(gy)), 0, alt_img - 1).astype(int)
+    cores = preenchida[v, u]
+    CABELO = np.array([0.80, 0.20, 0.10])
+    # Atrás da cabeça e nas costas até a cintura: cabelo (a referência só mostra a frente).
+    costas = nz_frente < -0.25
+    centro_tronco = np.abs(gx - CENTRO_X) < 0.27
+    eh_cabelo = costas & (((gy > 0.24) & centro_tronco) | (gy > 0.66))
+    orelha = gy > 0.91
+    eh_cabelo &= ~orelha
+    cores[eh_cabelo] = CABELO * (0.85 + 0.15 * np.clip(-nz_frente[eh_cabelo], 0, 1))[:, None]
+    # Realça a saturação (visual de anime).
+    cinza = cores.mean(1, keepdims=True)
+    return np.clip(cinza + (cores - cinza) * 1.1, 0, 1)
+
+
+cores = cores_modelo if USAR_MODELO else cores_por_referencia(REFERENCIA)
+# Cabelo (para os pesos): vermelho forte acima do quadril.
+r, g = cores[:, 0], cores[:, 1]
+eh_cabelo = (r > 0.45) & (g / np.maximum(r, 1e-3) < 0.38) & (gy > 0.15)
+
+# Grava como atributo de cor por vértice (sRGB).
+atributo = malha.color_attributes.new("Col", "BYTE_COLOR", "POINT")
+rgba = np.concatenate([cores, np.ones((n_v, 1))], axis=1)
+atributo.data.foreach_set("color_srgb", rgba.ravel())
+
+mat = bpy.data.materials.new("Pele")
+mat.use_nodes = True
+nos = mat.node_tree.nodes
+bsdf = nos.get("Principled BSDF")
+attr_no = nos.new("ShaderNodeVertexColor")
+attr_no.layer_name = "Col"
+mat.node_tree.links.new(attr_no.outputs["Color"], bsdf.inputs["Base Color"])
+bsdf.inputs["Roughness"].default_value = 0.9
+corpo.data.materials.append(mat)
+
+# Cabelo segue cabeça/peito (senão os cachos laterais acompanham os braços).
+# Só fora do tubo dos braços (medido na pose T, onde braço e cabelo estão separados).
+eh_cabelo &= d_bracos > 0.06
+idx_cabelo = np.where(eh_cabelo)[0].tolist()
+for g in corpo.vertex_groups:
+    g.remove(idx_cabelo)
+alto = [i for i in idx_cabelo if gy[i] >= 0.66]
+baixo = [i for i in idx_cabelo if gy[i] < 0.66]
+# (Busca os grupos de novo: as referências antigas não valem mais depois de aplicar o modificador.)
+corpo.vertex_groups["Head"].add(alto, 1.0, "REPLACE")
+corpo.vertex_groups["Chest"].add(baixo, 1.0, "REPLACE")
+print("vertices de cabelo:", len(idx_cabelo), "sem peso:", sum(1 for vt in malha.vertices if len(vt.groups) == 0))
+
+# ---------------------------------------------------------------------------
+# 6. Animações
+# ---------------------------------------------------------------------------
 def chave(acao_poses, quadro):
     """acao_poses: {osso: [(eixo, graus), ...]} ou {"Hips_loc": Vector}."""
     for pb in pose.bones:
@@ -370,7 +505,7 @@ def chave(acao_poses, quadro):
 
 
 def cauda_balanco(fase, amp=10.0):
-    return {f"Tail{i}": [(Z, amp * math.sin(fase + i * 0.7))] for i in range(1, 7)}
+    return {f"Tail{i}": [(Z, amp * math.sin(fase + i * 0.7))] for i in range(1, N_CAUDA + 1)}
 
 
 def criar_acao(nome, quadros, funcao):
@@ -535,7 +670,7 @@ for pb in pose.bones:
     pb.location = Vector()
 
 # ---------------------------------------------------------------------------
-# 6. Exportar
+# 7. Exportar
 # ---------------------------------------------------------------------------
 bpy.ops.object.select_all(action="SELECT")
 bpy.ops.export_scene.gltf(

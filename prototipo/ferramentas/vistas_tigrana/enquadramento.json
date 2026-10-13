@@ -1,9 +1,9 @@
 {
-  "largura": 1536,
+  "largura": 2048,
   "altura": 2048,
   "px_por_metro": 930.9090909090909,
   "centro_px": [
-    768.0,
+    1024.0,
     1024.0
   ],
   "centro_altura_m": 1.0,

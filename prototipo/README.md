@@ -93,19 +93,27 @@ Se o GLB tiver outros nomes (Mixamo, AccuRig etc.), mapeie no JSON:
 
 ### Rig automático de um modelo gerado por IA
 
-`ferramentas/riggar_modelo.py` transforma um GLB **só com geometria** (como o do Hunyuan3D) num personagem pronto para o jogo. Ele usa o Blender como módulo Python (`pip install bpy`, Python 3.13):
+`ferramentas/riggar_modelo.py` transforma um GLB **só com geometria** (como o do Hunyuan3D) num personagem pronto para o jogo. Ele usa o Blender como módulo Python (`pip install bpy`, Python 3.13). O modelo de entrada deve estar em **pose T** (braços abertos, sem encostar no corpo):
 
 ```bash
+# pintura copiada de uma versão anterior já riggada da mesma personagem
+python ferramentas/riggar_modelo.py ferramentas/tigrana_pose_t.glb ferramentas/tigrana_pintura_v1.glb modelos/tigrana/tigrana.glb
+# ou pintura projetada de uma imagem de referência (vista de frente)
 python ferramentas/riggar_modelo.py entrada.glb referencia.png modelos/nome/nome.glb
 ```
 
 1. Centraliza a malha e subdivide uma vez (mais resolução para a pintura).
-2. **Pinta** cores de vértice projetando a imagem de referência pela frente. Atrás da cabeça e nas costas, pinta cabelo.
-3. Cria o **esqueleto**: tronco, braços, pernas e 6 ossos de cauda, nas posições da tabela `JUNTAS`. Para outro modelo, meça essas posições numa vista com grade e troque a tabela.
-4. Calcula **pesos automáticos** (difusão de calor do Blender), prende o cabelo à cabeça e ao peito, e **separa braço e corpo** onde a malha encosta (pulso na coxa, braço colado ao tronco).
-5. Gera as 12 **animações** e exporta o GLB.
+2. Cria o **esqueleto**: tronco, braços, pernas e 7 ossos de cauda, nas posições da tabela `JUNTAS` (medidas por fatias da malha; para outro modelo, meça e troque a tabela).
+3. Calcula **pesos automáticos** (difusão de calor do Blender), com cada braço limitado a um tubo em volta dos seus ossos.
+4. **Abaixa os braços** (pose T → pose A) e grava essa pose como repouso, que é a que as animações esperam.
+5. **Pinta** cores de vértice: copiadas de um GLB riggado anterior (cada vértice é levado pelo seu osso até o outro modelo e pega a cor do vértice mais próximo da mesma região) ou projetadas da imagem de referência. O cabelo (vermelho) fica preso à cabeça e ao peito.
+6. Gera as 12 **animações** e exporta o GLB.
 
-**Limitações:** modelos gerados por IA vêm com os braços grudados no corpo, então o script remove os triângulos de contato. Ficam pequenos buracos nesses pontos, que aparecem quando o braço se afasta. Para um resultado melhor, gere o personagem em **pose T ou A, com os braços afastados do corpo**, ou faça um retoque manual no Blender.
+`ferramentas/tigrana_pintura_v1.glb` é a primeira versão da Tigrana (malha com os braços colados), mantida só como fonte da pintura.
+
+### Vistas para pintura externa
+
+`ferramentas/renderizar_vistas.py entrada.glb pasta` renderiza a malha crua (argila cinza) de frente, costas e laterais, em câmera ortográfica com enquadramento fixo (`enquadramento.json`). As vistas da Tigrana em pose T estão em `ferramentas/vistas_tigrana/`: servem para pintar num gerador de imagem e depois projetar a pintura de volta no modelo.
 
 ## Simular partidas (balanceamento)
 

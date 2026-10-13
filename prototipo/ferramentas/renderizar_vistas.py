@@ -6,7 +6,7 @@ para depois projetar as imagens pintadas de volta no modelo.
 Uso (Blender como módulo Python):
     python renderizar_vistas.py <entrada.glb> <pasta_saida>
 
-Gera: frente.png, costas.png, esquerda.png, direita.png (1536x2048), folha.png (as 4 lado a lado)
+Gera: frente.png, costas.png, esquerda.png, direita.png (2048x2048), folha.png (as 4 lado a lado)
 e enquadramento.json (pixels por metro e centro de cada vista).
 """
 import json
@@ -23,7 +23,7 @@ ENTRADA, PASTA = sys.argv[-2:]
 os.makedirs(PASTA, exist_ok=True)
 
 # Mesmo centro/chão do riggar_modelo.py, para as vistas baterem com o modelo riggado.
-CENTRO_X, CENTRO_Z_GLTF, CHAO_Y = -0.07, 0.19, -0.997
+CENTRO_X, CENTRO_Z_GLTF, CHAO_Y = -0.05, 0.20, -1.0004
 
 
 def para_blender(p):
@@ -52,7 +52,7 @@ def ler_glb(caminho):
 
     return acessor(prim["attributes"]["POSITION"]).astype(np.float64), acessor(prim["indices"]).reshape(-1, 3)
 
-LARGURA, ALTURA = 1536, 2048
+LARGURA, ALTURA = 2048, 2048  # quadrado: cabe a pose T (braços abertos)
 ESCALA_ORTO = 2.2  # metros visíveis na altura da imagem
 CENTRO_Z = 1.0      # altura (m) no centro da imagem
 
@@ -134,7 +134,7 @@ json.dump({
     },
 }, open(os.path.join(PASTA, "enquadramento.json"), "w"), indent=2, ensure_ascii=False)
 
-# Folha com as 4 vistas lado a lado (3072x1024).
+# Folha com as 4 vistas lado a lado (4096x1024).
 from PIL import Image  # noqa: E402
 folha = Image.new("RGB", (LARGURA * 2, ALTURA // 2))
 for i, nome in enumerate(["frente", "direita", "costas", "esquerda"]):
