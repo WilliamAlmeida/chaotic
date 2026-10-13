@@ -1,0 +1,16 @@
+{
+  "largura": 1536,
+  "altura": 2048,
+  "px_por_metro": 930.9090909090909,
+  "centro_px": [
+    768.0,
+    1024.0
+  ],
+  "centro_altura_m": 1.0,
+  "vistas": {
+    "frente": "horizontal = +X do Blender (esquerda do personagem à direita da imagem)",
+    "costas": "horizontal = -X",
+    "esquerda": "horizontal = +Y (costas do personagem à direita da imagem)",
+    "direita": "horizontal = -Y"
+  }
+}
