@@ -9,11 +9,12 @@ static var _contornos: Dictionary = {}
 
 
 ## Material "desenho animado": luz em faixas + contorno escuro opcional.
-static func material_toon(cor: Color, emissao := 0.0, contorno := true, espessura_px := 2.2) -> ShaderMaterial:
+static func material_toon(cor: Color, emissao := 0.0, contorno := true, espessura_px := 2.2, cor_vertice := false) -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
 	mat.shader = SHADER_TOON
 	mat.set_shader_parameter("cor", cor)
 	mat.set_shader_parameter("cor_sombra", _tom_sombra(cor))
+	mat.set_shader_parameter("usar_cor_vertice", cor_vertice)
 	if emissao > 0.0:
 		mat.set_shader_parameter("emissao", cor)
 		mat.set_shader_parameter("forca_emissao", emissao)

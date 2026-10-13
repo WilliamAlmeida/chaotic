@@ -88,6 +88,13 @@ var _mergulho := false
 var _visual: Node3D
 var _orbita: Node3D
 var _asas: Array[Node3D] = []
+# Modelo importado (GLB com esqueleto e animações), quando o monstro tem "modelo" no JSON.
+var _modelo_3d: Node3D
+var _anim: AnimationPlayer
+var _anim_atual := ""
+var _acao_t_anterior := 0.0
+var _dano_anim_t := 0.0
+var _instinto := false
 var _materiais: Array[ShaderMaterial] = []
 var _flash_t := 0.0
 var _anim_t := 0.0
@@ -220,6 +227,9 @@ func modificar_dano_causado(valor: float, ataque: Dictionary = {}) -> Array:
 	var arquetipo := str(ataque.get("arquetipo", ""))
 	if passiva == "vantagem_altura" and no_alto() and arquetipo == "projetil":
 		valor *= 1.2
+	if _instinto and arquetipo in ["basico", "investida"]:
+		_instinto = false
+		valor += 8.0
 	if _mergulho and arquetipo in ["investida", "salto"]:
 		_mergulho = false
 		valor += 6.0
@@ -469,6 +479,8 @@ func esquivar(dir: Vector3) -> void:
 	esquiva_t = 0.2
 	invulneravel_t = 0.4 if (passiva == "corrente_lateral" and _t_movendo >= 2.0) else 0.3
 	esquiva_recarga = recarga_esquiva()
+	if passiva == "instinto_felino":
+		_instinto = true
 	if passiva == "rastro_quente":
 		_rastro_quente = true
 
@@ -570,6 +582,7 @@ func receber_dano(valor: float, _origem: Lutador = null) -> void:
 		return
 	energia = maxf(0.0, energia - valor)
 	_flash_t = 0.12
+	_dano_anim_t = 0.35
 	if cantando:
 		_falhar_cantico("interrompido")
 	if energia <= 0.0:
@@ -744,6 +757,10 @@ func _derrotar() -> void:
 	controles_ativos = false
 	_remover_escudo()
 	mostrar_texto("Derrotado!", Color(1, 0.3, 0.3), 80)
+	if _anim:
+		_tocar("derrota")
+		derrotado.emit(self)
+		return
 	var tw := create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(_visual, "rotation_degrees:x", 85.0, 0.6).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
@@ -815,6 +832,9 @@ func _limitar_arena() -> void:
 func _animar(delta: float, horizontal: Vector3) -> void:
 	if _visual == null:
 		return
+	if _anim:
+		_animar_modelo(delta, horizontal)
+		return
 	if _orbita:
 		_orbita.rotation.y += delta * 0.8
 	_animar_asas(delta, true)
@@ -855,6 +875,130 @@ func _animar_asas(_delta: float, vivo: bool) -> void:
 		asa.rotation.z = lado * abertura
 
 
+# =====================================================================
+# Modelo importado (GLB riggado): materiais toon, animações e encaixes nos ossos
+# =====================================================================
+
+## Animações em loop; as outras tocam uma vez.
+const ANIMACOES_LOOP := ["parado", "andar", "correr", "cantar", "atordoado"]
+## Duração (s) de cada ação do jogo, para acelerar a animação até caber nela.
+const DURACAO_ACOES := {"basico": 0.35, "projetil": 0.4, "area": 0.75, "investida": DURACAO_INVESTIDA, "salto": 0.9}
+const ANIMACAO_DA_ACAO := {"basico": "atacar", "projetil": "conjurar", "area": "conjurar", "investida": "investida", "salto": "salto"}
+
+
+func _construir_modelo(caminho: String) -> void:
+	var cena: PackedScene = load(caminho)
+	_modelo_3d = cena.instantiate()
+	# Os modelos olham para +Z (padrão glTF); no jogo a frente é -Z.
+	_modelo_3d.rotation.y = PI
+	_visual.add_child(_modelo_3d)
+	for no in _modelo_3d.find_children("*", "MeshInstance3D", true, false):
+		var malha := no as MeshInstance3D
+		var mat := Efeitos.material_toon(Color.WHITE, 0.0, true, 2.0, true)
+		malha.material_override = mat
+		_materiais.append(mat)
+	var players := _modelo_3d.find_children("*", "AnimationPlayer", true, false)
+	if not players.is_empty():
+		_anim = players[0]
+		for nome_jogo in ANIMACOES_LOOP:
+			var clipe := _clipe(nome_jogo)
+			if _anim.has_animation(clipe):
+				_anim.get_animation(clipe).loop_mode = Animation.LOOP_LINEAR
+		_tocar("parado")
+	var esqueletos := _modelo_3d.find_children("*", "Skeleton3D", true, false)
+	if esqueletos.is_empty():
+		return
+	var esqueleto: Skeleton3D = esqueletos[0]
+	# Nomes dos ossos: padrão do riggar_modelo.py; o JSON pode trocar ("ossos"), ex.: Mixamo.
+	var ossos: Dictionary = dados_monstro.get("ossos", {})
+	_sockets["mao_dir"] = _encaixe_osso(esqueleto, str(ossos.get("mao_dir", "Hand.R")), Vector3(0, -0.07, 0.02))
+	_sockets["mao_esq"] = _encaixe_osso(esqueleto, str(ossos.get("mao_esq", "Hand.L")), Vector3(0, -0.07, 0.02))
+	_sockets["peito"] = _encaixe_osso(esqueleto, str(ossos.get("peito", "Chest")), Vector3(0, 0.08, -0.16))
+
+
+## Ponto preso a um osso. A orientação é corrigida para que, na pose de descanso,
+## o equipamento fique igual ao dos modelos procedurais (frente = -Z do monstro).
+func _encaixe_osso(esqueleto: Skeleton3D, osso: String, deslocamento: Vector3) -> Node3D:
+	var indice := esqueleto.find_bone(osso)
+	if indice < 0:
+		return _socket(Vector3(0, 1.2, -0.4))
+	var anexo := BoneAttachment3D.new()
+	anexo.bone_name = osso
+	esqueleto.add_child(anexo)
+	# Transformação do esqueleto dentro de _visual (o GLB pode ter nós intermediários).
+	var do_esqueleto := Transform3D()
+	var no: Node = esqueleto
+	while no != null and no != _visual:
+		do_esqueleto = (no as Node3D).transform * do_esqueleto
+		no = no.get_parent()
+	var base_osso := (do_esqueleto * esqueleto.get_bone_global_rest(indice)).basis
+	var encaixe := Node3D.new()
+	# Na pose de descanso o encaixe fica alinhado a _visual (frente = -Z), como nos modelos procedurais.
+	encaixe.transform = Transform3D(base_osso.inverse(), base_osso.inverse() * deslocamento)
+	anexo.add_child(encaixe)
+	return encaixe
+
+
+## Nome do clipe no GLB para uma animação do jogo ("animacoes" no JSON permite renomear).
+func _clipe(nome_jogo: String) -> String:
+	return str(dados_monstro.get("animacoes", {}).get(nome_jogo, nome_jogo))
+
+
+func _tocar(nome_jogo: String, reiniciar := false, velocidade := 1.0) -> void:
+	var nome := _clipe(nome_jogo)
+	if _anim == null or not _anim.has_animation(nome):
+		return
+	_anim.speed_scale = velocidade
+	if nome != _anim_atual or reiniciar:
+		_anim.play(nome, 0.12)
+		if reiniciar:
+			_anim.seek(0.0, true)
+		_anim_atual = nome
+
+
+func _animar_modelo(delta: float, horizontal: Vector3) -> void:
+	_dano_anim_t = maxf(0.0, _dano_anim_t - delta)
+	_visual.scale = Vector3.ONE * escala
+	if energia <= 0.0:
+		return
+	if atordoado_t > 0.0:
+		_tocar("atordoado")
+	elif cantando:
+		_tocar("cantar")
+	elif not acao.is_empty():
+		var tipo := str(acao["tipo"])
+		var t := float(acao["t"])
+		var nova: bool = t < _acao_t_anterior or _anim_atual != _clipe(str(ANIMACAO_DA_ACAO.get(tipo, "atacar")))
+		_acao_t_anterior = t
+		var nome: String = ANIMACAO_DA_ACAO.get(tipo, "atacar")
+		var duracao := float(DURACAO_ACOES.get(tipo, 0.5))
+		var velocidade := 1.0
+		if _anim.has_animation(_clipe(nome)):
+			velocidade = _anim.get_animation(_clipe(nome)).length / duracao
+		_tocar(nome, nova, velocidade)
+		return
+	elif esquiva_t > 0.0:
+		_tocar("esquiva", _anim_atual != _clipe("esquiva"), 1.5)
+	elif _dano_anim_t > 0.0:
+		_tocar("dano", _anim_atual != _clipe("dano"))
+	else:
+		var v := Vector2(horizontal.x, horizontal.z).length()
+		if v > 5.5:
+			_tocar("correr", false, clampf(v / 8.0, 0.8, 1.4))
+		elif v > 0.5:
+			_tocar("andar", false, clampf(v / 3.5, 0.7, 1.5))
+		else:
+			_tocar("parado")
+	_acao_t_anterior = 0.0
+
+
+## Usado pelos retratos das cartas/HUD: a animação de "parado" roda mesmo com o lutador pausado.
+func preparar_retrato() -> void:
+	if _anim:
+		_anim.process_mode = Node.PROCESS_MODE_ALWAYS
+		_tocar("parado")
+
+
 func _atualizar_flash(delta: float) -> void:
 	if _flash_t <= 0.0:
 		return
@@ -873,6 +1017,11 @@ func _construir_visual() -> void:
 	_visual = Node3D.new()
 	_visual.scale = Vector3.ONE * escala
 	add_child(_visual)
+	var caminho_modelo := str(dados_monstro.get("modelo", ""))
+	if caminho_modelo != "" and ResourceLoader.exists(caminho_modelo):
+		_construir_modelo(caminho_modelo)
+		_criar_equipamento()
+		return
 	_orbita = Node3D.new()
 	_visual.add_child(_orbita)
 	var cor := Color(str(dados_monstro.get("cor", "#888888")))

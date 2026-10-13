@@ -3,7 +3,7 @@
 Protótipo jogável do conceito em [`../docs/conceito-jogo-3d.md`](../docs/conceito-jogo-3d.md): um jogo de **ação 3D** em que as **cartas são o loadout**, como no anime *Chaotic*. Elas definem o monstro que você controla, o equipamento que ele carrega, o cenário da luta, o Cântico (magia musical) e os golpes que aparecem na sua mão durante o combate.
 
 - Visual: **cel shading de anime com contorno**, cartas e HUD seguindo o conceito de GUI em [`../docs/gui-conceito.md`](../docs/gui-conceito.md).
-- Conteúdo: **14 monstros (2 voadores), 24 ataques, 8 equipamentos, 6 Cânticos e 7 arenas** do mundo de Teralume ([`../docs/design-teralume.md`](../docs/design-teralume.md)).
+- Conteúdo: **15 monstros (2 voadores e 1 com modelo 3D riggado), 24 ataques, 8 equipamentos, 6 Cânticos e 7 arenas** do mundo de Teralume ([`../docs/design-teralume.md`](../docs/design-teralume.md)).
 
 > Nomes, monstros, símbolos e textos são **próprios**. Nada usa marca, nomes ou arte de *Chaotic*.
 
@@ -40,7 +40,7 @@ No loadout: setas ‹ › (ou clique na carta) trocam a carta. Clique nas cartas
 | Conceito | Como funciona no protótipo |
 |---|---|
 | **Facções** | Clã das Cinzas, Reino das Marés, Colmeia de Rocha e Nômades da Areia, cada uma com paleta, marca e símbolo de Cântico |
-| **Carta de Monstro** | 12 monstros com Agilidade, Força, Mente, Ânimo, Energia, elementos, cargas de Cântico e **passiva própria** (as 12 funcionam na luta). O modelo é montado pela forma (`agil`, `robusto`, `mistico`) mais as peças de silhueta da lista `pecas` |
+| **Carta de Monstro** | 15 monstros com Agilidade, Força, Mente, Ânimo, Energia, elementos, cargas de Cântico e **passiva própria** (as 12 funcionam na luta). O modelo é montado pela forma (`agil`, `robusto`, `mistico`) mais as peças de silhueta da lista `pecas` |
 | **Atributos na ação** | Agilidade → velocidade e recarga da esquiva · Força → golpe básico e resistência a empurrões · Mente → recarga das cartas e força dos Cânticos · Ânimo → crítico e resistência a atordoamento |
 | **Deck de ataques** | 6 a 10 cartas, **orçamento de 20 pontos** e **mão de 3** que recarrega após o uso |
 | **Arquétipos** | Projétil, Área, Investida e Salto, com aviso no chão, onda de choque e cor do elemento |
@@ -71,6 +71,41 @@ Tudo fica em `data/*.json`, sem mexer em código:
   - `perigos` dos locais: `lava` (dano), `agua` (lentidão), `mato` (capim alto que esconde) e `nevoa` (névoa que esconde). Os `obstaculos` `[x, z, raio, altura]` viram cobertura destrutível
 
 **Arte final das cartas:** salve `arte/cartas/<id>.png` e ela substitui a arte procedural automaticamente.
+
+## Modelos 3D próprios (GLB riggado)
+
+Um monstro pode usar um modelo 3D no lugar das formas primitivas: basta o campo `"modelo"` no `monstros.json` (exemplo: a **Tigrana**, `modelos/tigrana/tigrana.glb`). O jogo:
+
+- aplica o cel shading e o contorno usando as **cores de vértice** do modelo;
+- toca as animações conforme o estado: `parado`, `andar`, `correr`, `atacar` (golpe básico), `conjurar` (projétil e área), `investida`, `salto`, `esquiva`, `cantar`, `dano`, `atordoado` e `derrota`;
+- prende o equipamento nos ossos `Hand.R`, `Hand.L` e `Chest`;
+- mostra o modelo animado (respirando) na carta e no retrato da HUD.
+
+| Animações da Tigrana | |
+|---|---|
+| ![](capturas/tigrana_animacoes_2.png) | ![](capturas/tigrana_animacoes.png) |
+
+Se o GLB tiver outros nomes (Mixamo, AccuRig etc.), mapeie no JSON:
+```json
+"animacoes": {"parado": "Idle", "correr": "Running", "atacar": "Punch"},
+"ossos": {"mao_dir": "mixamorig:RightHand", "mao_esq": "mixamorig:LeftHand", "peito": "mixamorig:Spine2"}
+```
+
+### Rig automático de um modelo gerado por IA
+
+`ferramentas/riggar_modelo.py` transforma um GLB **só com geometria** (como o do Hunyuan3D) num personagem pronto para o jogo. Ele usa o Blender como módulo Python (`pip install bpy`, Python 3.13):
+
+```bash
+python ferramentas/riggar_modelo.py entrada.glb referencia.png modelos/nome/nome.glb
+```
+
+1. Centraliza a malha e subdivide uma vez (mais resolução para a pintura).
+2. **Pinta** cores de vértice projetando a imagem de referência pela frente. Atrás da cabeça e nas costas, pinta cabelo.
+3. Cria o **esqueleto**: tronco, braços, pernas e 6 ossos de cauda, nas posições da tabela `JUNTAS`. Para outro modelo, meça essas posições numa vista com grade e troque a tabela.
+4. Calcula **pesos automáticos** (difusão de calor do Blender), prende o cabelo à cabeça e ao peito, e **separa braço e corpo** onde a malha encosta (pulso na coxa, braço colado ao tronco).
+5. Gera as 12 **animações** e exporta o GLB.
+
+**Limitações:** modelos gerados por IA vêm com os braços grudados no corpo, então o script remove os triângulos de contato. Ficam pequenos buracos nesses pontos, que aparecem quando o braço se afasta. Para um resultado melhor, gere o personagem em **pose T ou A, com os braços afastados do corpo**, ou faça um retoque manual no Blender.
 
 ## Simular partidas (balanceamento)
 

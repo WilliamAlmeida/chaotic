@@ -14,9 +14,13 @@ uniform vec4 emissao : source_color = vec4(0.0, 0.0, 0.0, 1.0);
 uniform float forca_emissao = 0.0;
 // 0..1: pisca branco quando o monstro leva dano.
 uniform float flash : hint_range(0.0, 1.0) = 0.0;
+// Modelos importados (ex.: GLB riggado) trazem a pintura nas cores de vértice.
+uniform bool usar_cor_vertice = false;
 
 void fragment() {
-	ALBEDO = mix(cor.rgb, vec3(1.0), flash);
+	// A cor de vértice do glTF chega convertida para linear duas vezes; desfaz uma.
+	vec3 base = usar_cor_vertice ? cor.rgb * pow(COLOR.rgb, vec3(1.0 / 2.2)) : cor.rgb;
+	ALBEDO = mix(base, vec3(1.0), flash);
 	EMISSION = emissao.rgb * forca_emissao + vec3(flash * 0.6);
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;

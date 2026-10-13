@@ -57,12 +57,17 @@ func definir(id: String, equip_id := "") -> void:
 	_pivo.add_child(l)
 	if equip_id != "":
 		l.mostrar_equipamento()
+	l.preparar_retrato()
 	var e := l.escala
 	var foco := Vector3(0, 1.15 * e, 0)
 	var distancia := 5.0 * e
 	if enquadramento == "rosto":
 		foco = Vector3(0, 1.55 * e, 0)
 		distancia = 2.6 * e
+	if str(Dados.monstros[id].get("modelo", "")) != "":
+		# Modelos importados são mais esguios que os procedurais: enquadra mais perto.
+		distancia *= 0.72
+		foco.y *= 1.08
 	_camera.position = Vector3(0.9 * e, foco.y + 0.35 * e, -distancia)
 	_camera.look_at(foco, Vector3.UP)
 
