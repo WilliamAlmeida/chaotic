@@ -30,8 +30,10 @@ static func pasta() -> String:
 	return OS.get_user_data_dir()
 
 
-## Simula um toque/clique de tela numa posição (coordenadas do viewport base 1920x1080).
+## Simula um toque/clique de tela numa posição (coordenadas do viewport base 1920x1080;
+## convertidas para pixels da janela, como Input.parse_input_event espera).
 static func tocar(arvore: SceneTree, pos: Vector2, soltar := true) -> void:
+	pos = arvore.root.get_final_transform() * pos
 	var ev := InputEventScreenTouch.new()
 	ev.position = pos
 	ev.pressed = true

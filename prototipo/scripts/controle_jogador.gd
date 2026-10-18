@@ -1,6 +1,13 @@
 class_name ControleJogador
 extends Node
 ## Lê o teclado/mouse/controle e repassa para o Lutador do jogador.
+## Os controles de toque (ControleToque) injetam as mesmas ações no InputMap, então
+## nada aqui precisa saber se o jogador está num celular.
+
+## Abertura (em graus) do cone em que a mira assistida do modo fácil puxa o movimento para o inimigo.
+const CONE_ASSISTENCIA := 30.0
+## Força máxima da assistência (0 = nada, 1 = anda direto para o inimigo).
+const PESO_ASSISTENCIA := 0.5
 
 var lutador: Lutador
 var camera: CameraOrbita
@@ -22,7 +29,32 @@ func _physics_process(_delta: float) -> void:
 		direita.y = 0.0
 		frente = frente.normalized()
 		direita = direita.normalized()
-	lutador.direcao_movimento = (direita * entrada.x - frente * entrada.y).limit_length(1.0)
+	var direcao := (direita * entrada.x - frente * entrada.y).limit_length(1.0)
+	if Jogo.facil() and direcao.length() > 0.1:
+		direcao = _assistir_direcao(direcao)
+	lutador.direcao_movimento = direcao
+
+
+## Mira assistida leve (modo fácil): se o jogador anda quase na direção do inimigo, o
+## movimento é puxado um pouco para ele, assim a criança chega ao alvo sem precisão fina.
+## Parado, nada muda (o Lutador já vira sozinho para o alvo). As ações continuam as mesmas.
+func _assistir_direcao(direcao: Vector3) -> Vector3:
+	if not is_instance_valid(lutador.alvo) or lutador.alvo.energia <= 0.0:
+		return direcao
+	var para_alvo := lutador.alvo.global_position - lutador.global_position
+	para_alvo.y = 0.0
+	if para_alvo.length() < 1.5:
+		return direcao
+	para_alvo = para_alvo.normalized()
+	var angulo := direcao.normalized().angle_to(para_alvo)
+	var cone := deg_to_rad(CONE_ASSISTENCIA)
+	if angulo > cone:
+		return direcao
+	var peso := PESO_ASSISTENCIA * (1.0 - angulo / cone)
+	var nova := direcao.normalized().lerp(para_alvo, peso)
+	if nova.length() < 0.001:
+		return direcao
+	return nova.normalized() * direcao.length()
 
 
 func _process(_delta: float) -> void:
