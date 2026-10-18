@@ -290,3 +290,83 @@ static func emblema(ci: CanvasItem, f: Dictionary, c: Vector2, r: float) -> void
 	var m := str(f.get("marca", ""))
 	if m != "":
 		marca(ci, m, c, r * 0.62, cor.lightened(0.2))
+
+
+# ---------------------------------------------------------------------
+# Ícones da HUD "desenho animado": setas, alerta, estrela, certo/errado, coração
+# ---------------------------------------------------------------------
+
+## Seta grossa com contorno apontando para "cima", "baixo", "esq" ou "dir".
+static func seta(ci: CanvasItem, c: Vector2, r: float, direcao: String, cor: Color, contorno := true) -> void:
+	var ang: float = {"cima": -PI / 2.0, "baixo": PI / 2.0, "esq": PI, "dir": 0.0}.get(direcao, 0.0)
+	var unit := [[-0.9, -0.38], [0.05, -0.38], [0.05, -0.85], [0.95, 0.0], [0.05, 0.85], [0.05, 0.38], [-0.9, 0.38]]
+	var pts := PackedVector2Array()
+	for p in unit:
+		pts.append(c + Vector2(p[0], p[1]).rotated(ang) * r)
+	ci.draw_colored_polygon(pts, cor)
+	# Brilho na metade de cima da seta (volume de desenho animado).
+	var claro := PackedVector2Array()
+	for p in [[-0.8, -0.3], [0.0, -0.3], [0.0, -0.7], [0.75, 0.0], [0.0, 0.0], [-0.8, 0.0]]:
+		claro.append(c + Vector2(p[0], p[1]).rotated(ang) * r * 0.92)
+	ci.draw_colored_polygon(claro, Color(1, 1, 1, 0.22))
+	if contorno:
+		ci.draw_polyline(fechar(pts), CONTORNO, maxf(2.0, r * 0.12), true)
+
+
+## Triângulo de alerta com ponto de exclamação.
+static func alerta(ci: CanvasItem, c: Vector2, r: float, cor: Color) -> void:
+	var pts := PackedVector2Array([c + Vector2(0, -1.0) * r, c + Vector2(0.95, 0.75) * r, c + Vector2(-0.95, 0.75) * r])
+	ci.draw_colored_polygon(pts, cor)
+	ci.draw_polyline(fechar(pts), CONTORNO, maxf(2.0, r * 0.14), true)
+	ci.draw_line(c + Vector2(0, -0.42) * r, c + Vector2(0, 0.22) * r, CONTORNO, maxf(2.0, r * 0.2))
+	ci.draw_circle(c + Vector2(0, 0.48) * r, r * 0.11, CONTORNO)
+
+
+## Estrela de 5 pontas (resultado da partida). Apagada = cinza com contorno.
+static func estrela(ci: CanvasItem, c: Vector2, r: float, cor: Color, acesa := true, rot := 0.0) -> void:
+	var pts := PackedVector2Array()
+	for i in 10:
+		var a := -PI / 2.0 + i * PI / 5.0 + rot
+		var raio := r if i % 2 == 0 else r * 0.46
+		pts.append(c + Vector2(cos(a), sin(a)) * raio)
+	if acesa:
+		ci.draw_colored_polygon(pts, cor)
+		var miolo := PackedVector2Array()
+		for i in 10:
+			var a := -PI / 2.0 + i * PI / 5.0 + rot
+			var raio := r * 0.55 if i % 2 == 0 else r * 0.25
+			miolo.append(c + Vector2(-0.08, -0.12) * r + Vector2(cos(a), sin(a)) * raio)
+		ci.draw_colored_polygon(miolo, Color(1, 1, 1, 0.35))
+	else:
+		ci.draw_colored_polygon(pts, Color(0.22, 0.25, 0.3, 0.9))
+	ci.draw_polyline(fechar(pts), CONTORNO, maxf(2.0, r * 0.1), true)
+
+
+## Sinal de "certo" (✓) grosso.
+static func certo(ci: CanvasItem, c: Vector2, r: float, cor: Color) -> void:
+	var pts := PackedVector2Array([c + Vector2(-0.8, 0.05) * r, c + Vector2(-0.25, 0.65) * r, c + Vector2(0.85, -0.6) * r])
+	ci.draw_polyline(pts, CONTORNO, maxf(3.0, r * 0.42), true)
+	ci.draw_polyline(pts, cor, maxf(2.0, r * 0.26), true)
+
+
+## Sinal de "errado" (✕) grosso.
+static func errado(ci: CanvasItem, c: Vector2, r: float, cor: Color) -> void:
+	for lado in [1.0, -1.0]:
+		var a := c + Vector2(-0.7, -0.7 * lado) * r
+		var b := c + Vector2(0.7, 0.7 * lado) * r
+		ci.draw_line(a, b, CONTORNO, maxf(3.0, r * 0.42), true)
+	for lado in [1.0, -1.0]:
+		var a := c + Vector2(-0.7, -0.7 * lado) * r
+		var b := c + Vector2(0.7, 0.7 * lado) * r
+		ci.draw_line(a, b, cor, maxf(2.0, r * 0.26), true)
+
+
+## Coração (Energia).
+static func coracao(ci: CanvasItem, c: Vector2, r: float, cor: Color) -> void:
+	ci.draw_circle(c + Vector2(-0.45, -0.3) * r, 0.55 * r, CONTORNO)
+	ci.draw_circle(c + Vector2(0.45, -0.3) * r, 0.55 * r, CONTORNO)
+	ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-1.02, -0.05) * r, c + Vector2(1.02, -0.05) * r, c + Vector2(0, 1.05) * r]), CONTORNO)
+	ci.draw_circle(c + Vector2(-0.45, -0.3) * r, 0.45 * r, cor)
+	ci.draw_circle(c + Vector2(0.45, -0.3) * r, 0.45 * r, cor)
+	ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-0.88, -0.08) * r, c + Vector2(0.88, -0.08) * r, c + Vector2(0, 0.9) * r]), cor)
+	ci.draw_circle(c + Vector2(-0.5, -0.45) * r, 0.14 * r, Color(1, 1, 1, 0.6))

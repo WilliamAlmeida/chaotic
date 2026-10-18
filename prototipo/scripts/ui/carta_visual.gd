@@ -24,9 +24,15 @@ var alvo: Lutador
 ## Contexto do loadout: elementos do monstro escolhido.
 var elementos_dono: Array = []
 var interativa := false
+## Na mão da luta: brilho dourado pulsante enquanto a carta está pronta para usar.
+var brilho_pronta := false
+## Escala extra animada (pulso ao ficar pronta); 1.0 = normal.
+var escala_extra := 1.0
 
 var _hover := false
 var _pulso := 0.0
+var _flash := 0.0
+var _ultimo_clique_ms := 0
 var _retrato: RetratoMonstro
 var _base := BASE_RETRATO
 
@@ -50,23 +56,48 @@ func _ready() -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
+	if not interativa:
+		return
 	var botao := event as InputEventMouseButton
-	if interativa and botao and botao.pressed and botao.button_index == MOUSE_BUTTON_LEFT:
-		clicada.emit(self)
-		accept_event()
+	var toque := event as InputEventScreenTouch
+	var apertou := (botao != null and botao.pressed and botao.button_index == MOUSE_BUTTON_LEFT) \
+		or (toque != null and toque.pressed)
+	if not apertou:
+		return
+	accept_event()
+	# O toque chega duas vezes (toque real + mouse emulado): aceita só o primeiro.
+	var agora := Time.get_ticks_msec()
+	if agora - _ultimo_clique_ms < 120:
+		return
+	_ultimo_clique_ms = agora
+	clicada.emit(self)
+
+
+## Pulso "saltitante" (carta ficou pronta, carta usada): cresce e volta com elástico.
+func pulsar(forca := 0.18) -> void:
+	_flash = 1.0
+	escala_extra = 1.0 + forca
+	var tw := create_tween()
+	tw.tween_property(self, "escala_extra", 1.0, 0.55).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
 
 func _process(delta: float) -> void:
-	if selecionada or _retrato != null:
+	if _flash > 0.0:
+		_flash = maxf(0.0, _flash - delta * 3.0)
+	if selecionada or _retrato != null or brilho_pronta or escala_extra != 1.0 or _flash > 0.0:
 		_pulso += delta * 3.0
 		queue_redraw()
 
 
 func _draw() -> void:
-	var s := minf(size.x / _base.x, size.y / _base.y)
+	var s := minf(size.x / _base.x, size.y / _base.y) * escala_extra
 	if _hover and interativa and not desabilitada:
 		s *= 1.03
 	draw_set_transform((size - _base * s) / 2.0, 0.0, Vector2(s, s))
+	if _pronta():
+		# Aura dourada pulsante atrás da carta.
+		var aura := 0.35 + 0.25 * sin(_pulso * 1.6)
+		draw_style_box(Tema.caixa(Color(0, 0, 0, 0), Color(Tema.OURO_CLARO, aura), 0, 22, Color(Tema.OURO, aura), 26), Rect2(Vector2.ZERO, _base))
 	match tipo:
 		"monstro":
 			_carta_monstro()
@@ -82,7 +113,13 @@ func _draw() -> void:
 		draw_style_box(Tema.caixa(Color(0.07, 0.09, 0.13, 0.62), Color(0, 0, 0, 0), 0, 16), Rect2(Vector2.ZERO, _base))
 	if progresso < 1.0:
 		_sobreposicao_recarga()
+	if _flash > 0.0:
+		draw_style_box(Tema.caixa(Color(1, 1, 1, 0.65 * _flash), Color(0, 0, 0, 0), 0, 16), Rect2(Vector2.ZERO, _base))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _pronta() -> bool:
+	return brilho_pronta and interativa and not desabilitada and progresso >= 1.0 and id != ""
 
 
 # =====================================================================
@@ -253,6 +290,14 @@ func _carta_local() -> void:
 	if bool(loc.get("vento", false)):
 		perigos.append("vento")
 	var extra := "" if perigos.is_empty() else " Perigos: %s." % ", ".join(perigos)
+	var eventos := _nomes_eventos(loc)
+	if not eventos.is_empty():
+		extra += " Eventos: %s." % ", ".join(eventos)
+		# Chip de alerta sobre a arte avisando que a arena tem eventos.
+		var chip := Rect2(arte.position.x + 6, arte.position.y + 6, 104, 26)
+		draw_style_box(Tema.caixa(Color(Tema.CARVAO, 0.88), Tema.OURO, 2, 6), chip)
+		Icones.alerta(self, Vector2(chip.position.x + 15, chip.get_center().y + 1), 9, Tema.LARANJA)
+		Tema.texto(self, Tema.fonte("titulo"), Vector2(chip.position.x + 28, chip.position.y + 19), "EVENTOS", 14, Tema.OURO_CLARO, -1, HORIZONTAL_ALIGNMENT_LEFT, 2)
 	_caixa_texto(Rect2(14, 312, 252, 80), "", str(loc.get("descricao", "")) + extra)
 	_rodape("Local", "castelo", cor, escura)
 	if selecionada:
@@ -282,36 +327,43 @@ func _carta_ataque() -> void:
 	var cor: Color = Dados.ELEMENTOS[el]["cor"] if el != "" else Tema.MOLDURA_NEUTRA[1]
 	var clara: Color = Dados.ELEMENTOS[el]["clara"] if el != "" else Tema.MOLDURA_NEUTRA[2]
 	_moldura(escura, cor, clara)
-	_faixa_nome(str(atk["nome"]), cor, 166, Rect2(10, 10, 220, 38))
-	_selo(str(int(atk["custo"])), escura, Vector2(210, 30), 21)
+	_faixa_nome(str(atk["nome"]), cor, 166, Rect2(10, 10, 220, 40))
+	_selo(str(int(atk["custo"])), escura, Vector2(210, 30), 22)
 
-	var arte := Rect2(12, 52, 216, 118)
+	# Arte: glifo do arquétipo bem grande sobre linhas de velocidade.
+	var arte := Rect2(12, 54, 216, 126)
 	_fundo_arte(arte, clara, cor.darkened(0.45), escura)
 	if not _desenhar_arte_arquivo(arte):
-		var c := arte.get_center() + Vector2(0, -6)
-		Tema.brilho_radial(self, c, 70, Color(1, 1, 1, 0.7))
-		_glifo_arquetipo(str(atk["arquetipo"]), c, 36, Color(1, 1, 1, 0.95))
-	_chip_valor(Vector2(arte.position.x + 5, arte.end.y - 34), "espada", str(int(atk["dano_base"])), Color("#e6e6e6"))
+		var c := arte.get_center() + Vector2(0, -10)
+		Tema.brilho_radial(self, c, 78, Color(1, 1, 1, 0.75))
+		_glifo_arquetipo(str(atk["arquetipo"]), c, 46, Color(1, 1, 1, 0.97))
+	# Dano em número grande (chip com espada) e bônus elementais.
+	var chip := Rect2(arte.position.x + 4, arte.end.y - 44, 104, 40)
+	draw_style_box(Tema.caixa(Color(Tema.CARVAO, 0.9), Tema.OURO, 2, 8), chip)
+	Icones.espada(self, Vector2(chip.position.x + 20, chip.get_center().y), 14, Color("#e6e6e6"))
+	Tema.texto(self, Tema.fonte("numero"), Vector2(chip.position.x + 38, chip.get_center().y + 13), str(int(atk["dano_base"])), 36, Tema.OURO_CLARO, -1, HORIZONTAL_ALIGNMENT_LEFT, 4)
 	var bonus: Dictionary = atk.get("bonus_elemento", {})
-	var bx := arte.end.x - 18
+	var bx := arte.end.x - 20
 	for b in bonus:
 		var aceso := _tem_elemento(str(b))
-		Tema.texto(self, Tema.fonte("numero"), Vector2(bx - 44, arte.end.y - 9), "+%d" % int(bonus[b]), 20, Tema.TEXTO if aceso else Tema.TEXTO_SUAVE, 28, HORIZONTAL_ALIGNMENT_RIGHT, 3)
-		Icones.elemento(self, str(b), Vector2(bx, arte.end.y - 16), 13, aceso)
-		bx -= 66
+		Tema.texto(self, Tema.fonte("numero"), Vector2(bx - 54, arte.end.y - 12), "+%d" % int(bonus[b]), 24, Tema.TEXTO if aceso else Tema.TEXTO_SUAVE, 34, HORIZONTAL_ALIGNMENT_RIGHT, 4)
+		Icones.elemento(self, str(b), Vector2(bx, arte.end.y - 20), 15, aceso)
+		bx -= 72
 
-	var caixa := Rect2(12, 174, 216, 90)
+	# Caixa de texto: arquétipo em destaque e a condição em poucas palavras.
+	var caixa := Rect2(12, 184, 216, 82)
 	draw_style_box(Tema.caixa(Tema.PERGAMINHO, escura.lightened(0.1), 2, 6), caixa)
-	var linha := "%s  ·  Dano %d" % [Dados.ARQUETIPOS.get(str(atk["arquetipo"]), ""), int(atk["dano_base"])]
-	Tema.texto(self, Tema.fonte("texto_negrito"), caixa.position + Vector2(8, 19), linha, 13, Tema.TEXTO_ESCURO, caixa.size.x - 16)
+	var arquetipo := str(Dados.ARQUETIPOS.get(str(atk["arquetipo"]), "Golpe"))
+	Tema.texto(self, Tema.fonte("titulo"), caixa.position + Vector2(8, 22), arquetipo.to_upper(), 17, Tema.TEXTO_ESCURO, caixa.size.x - 16)
 	var cond: Dictionary = atk.get("condicao", {})
 	var texto_cond := "Sem condição." if cond.is_empty() else Combate.descrever_condicao(cond)
 	var cor_cond := Tema.TEXTO_ESCURO
 	if not cond.is_empty() and dono != null and alvo != null:
 		var ativa := Combate.avaliar_condicao(cond, dono, alvo)
-		texto_cond = ("ATIVA: " if ativa else "inativa: ") + texto_cond
+		if ativa:
+			_chip_texto(Vector2(caixa.end.x - 68, caixa.position.y + 6), "ATIVA", Tema.VERDE_CLARO)
 		cor_cond = Tema.VERDE_ATIVO if ativa else Color("#8a8070")
-	draw_multiline_string(Tema.fonte("texto"), caixa.position + Vector2(8, 38), texto_cond, HORIZONTAL_ALIGNMENT_LEFT, caixa.size.x - 16, 12, 4, cor_cond)
+	draw_multiline_string(Tema.fonte("texto_negrito"), caixa.position + Vector2(8, 44), texto_cond, HORIZONTAL_ALIGNMENT_LEFT, caixa.size.x - 16, 14, 3, cor_cond)
 	_rodape("Ataque", "", cor, escura, 300.0)
 	if selecionada:
 		_fita(Rect2(), "Selecionada", cor)
@@ -334,6 +386,9 @@ func _moldura(escura: Color, cor: Color, clara: Color) -> void:
 	if selecionada:
 		brilho = Color(clara.lerp(cor, 0.3), 0.55 + 0.3 * sin(_pulso))
 		tamanho_brilho = 20
+	elif _pronta():
+		brilho = Color(Tema.OURO_CLARO, 0.5 + 0.3 * sin(_pulso * 1.6))
+		tamanho_brilho = 16
 	elif _hover and interativa and not desabilitada:
 		brilho = Color(clara, 0.35)
 		tamanho_brilho = 10
@@ -501,6 +556,27 @@ func _paisagem(r: Rect2, loc: Dictionary) -> void:
 			"pilar":
 				draw_rect(Rect2(base - Vector2(largura * 0.5, altura), Vector2(largura, altura)), Color("#e6e2d6"))
 				draw_rect(Rect2(base - Vector2(largura * 0.75, altura + 3), Vector2(largura * 1.5, 4)), Color("#f4f0e6"))
+			"cristal":
+				# Cristal facetado: losango alto com uma face clara.
+				var pts := PackedVector2Array([base + Vector2(-largura * 0.8, 0), base + Vector2(-largura * 0.5, -altura * 0.7),
+					base + Vector2(0, -altura * 1.2), base + Vector2(largura * 0.6, -altura * 0.6), base + Vector2(largura * 0.8, 0)])
+				draw_colored_polygon(pts, Color("#7fd3ff"))
+				draw_colored_polygon(PackedVector2Array([base + Vector2(-largura * 0.5, -altura * 0.7), base + Vector2(0, -altura * 1.2), base + Vector2(0, 0)]), Color("#d8f4ff"))
+				draw_polyline(Icones.fechar(pts), Color("#1e4a6a"), 1.5, true)
+			"metal":
+				# Coluna metálica com faixas e luz de borda.
+				draw_rect(Rect2(base - Vector2(largura * 0.55, altura), Vector2(largura * 1.1, altura)), Color("#8d97a6"))
+				draw_rect(Rect2(base - Vector2(largura * 0.55, altura), Vector2(largura * 0.3, altura)), Color("#c9d2de"))
+				for k in 3:
+					draw_rect(Rect2(base - Vector2(largura * 0.55, altura * (0.25 + 0.25 * k)), Vector2(largura * 1.1, 2)), Color("#3a4657"))
+				draw_rect(Rect2(base - Vector2(largura * 0.7, altura + 4), Vector2(largura * 1.4, 5)), Color("#e8b75a"))
+			"corrompido":
+				# Espinho escuro e torto com brilho roxo.
+				var pts := PackedVector2Array([base + Vector2(-largura, 0), base + Vector2(-largura * 0.2, -altura * 0.6),
+					base + Vector2(largura * 0.3, -altura * 1.3), base + Vector2(largura * 0.5, -altura * 0.5), base + Vector2(largura, 0)])
+				draw_colored_polygon(pts, Color("#2a1638"))
+				draw_polyline(Icones.fechar(pts), Color("#b86bff"), 2.0, true)
+				draw_circle(base + Vector2(largura * 0.15, -altura * 0.55), largura * 0.3, Color("#d99bff"))
 			_:
 				draw_colored_polygon(PackedVector2Array([base + Vector2(-largura, 0), base + Vector2(-largura * 0.35, -altura),
 					base + Vector2(largura * 0.4, -altura * 0.8), base + Vector2(largura, 0)]), chao.lightened(0.4))
@@ -511,6 +587,20 @@ func _paisagem(r: Rect2, loc: Dictionary) -> void:
 				var x := r.position.x + 20 + k * 12
 				pts.append(Vector2(x, r.position.y + 28 + i * 18 + sin(k * 0.8 + i) * 4))
 			draw_polyline(pts, Color(1, 1, 1, 0.55), 2.0, true)
+
+
+## Nomes dos eventos da arena (campo opcional "eventos": textos ou dicionários com nome/tipo).
+func _nomes_eventos(loc: Dictionary) -> PackedStringArray:
+	var nomes := PackedStringArray()
+	for ev in loc.get("eventos", []):
+		var nome := ""
+		if typeof(ev) == TYPE_DICTIONARY:
+			nome = str(ev.get("nome", ev.get("titulo", ev.get("tipo", ""))))
+		else:
+			nome = str(ev)
+		if nome != "" and not nomes.has(nome):
+			nomes.append(nome.capitalize() if nome == nome.to_lower() else nome)
+	return nomes
 
 
 func _elipse(c: Vector2, rx: float, ry: float, cor: Color) -> void:

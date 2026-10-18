@@ -112,3 +112,32 @@ static func brilho_radial(ci: CanvasItem, c: Vector2, raio: float, cor: Color, p
 	for i in passos:
 		var k := 1.0 - float(i) / passos
 		ci.draw_circle(c, raio * k, Color(cor, cor.a * (1.0 / passos) * 1.6))
+
+
+## Cores vivas para feedback de acerto/erro/aviso (HUD infantil).
+const VERDE_CLARO := Color("#5dff8a")
+const VERMELHO_CLARO := Color("#ff6b5a")
+const AZUL_CLARO := Color("#7fd3ff")
+const LARANJA := Color("#ff9f3d")
+
+
+## Deixa um Button enorme e colorido, bom para dedos pequenos em celular.
+static func botao_grande(b: Button, cor: Color, tamanho_fonte := 30, minimo := Vector2(380, 92)) -> void:
+	b.custom_minimum_size = minimo
+	b.add_theme_font_override("font", fonte("titulo"))
+	b.add_theme_font_size_override("font_size", tamanho_fonte)
+	b.add_theme_color_override("font_color", TEXTO)
+	b.add_theme_color_override("font_hover_color", OURO_CLARO)
+	b.add_theme_color_override("font_pressed_color", OURO_CLARO)
+	b.add_theme_constant_override("outline_size", 6)
+	b.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	var normal := caixa(cor, OURO, 4, 18, Color(cor, 0.35), 10)
+	normal.set_content_margin_all(14)
+	var foco := caixa(cor.lightened(0.15), OURO_CLARO, 4, 18, Color(OURO, 0.5), 16)
+	foco.set_content_margin_all(14)
+	var pressionado := caixa(cor.darkened(0.25), OURO, 4, 18)
+	pressionado.set_content_margin_all(14)
+	b.add_theme_stylebox_override("normal", normal)
+	b.add_theme_stylebox_override("hover", foco)
+	b.add_theme_stylebox_override("focus", foco)
+	b.add_theme_stylebox_override("pressed", pressionado)
