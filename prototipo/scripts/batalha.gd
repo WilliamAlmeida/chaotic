@@ -54,7 +54,13 @@ func _ready() -> void:
 		controle.lutador = jogador
 		controle.camera = camera
 		add_child(controle)
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		if Jogo.toque_ativo():
+			var toque := ControleToque.new()
+			toque.lutador = jogador
+			toque.camera = camera
+			add_child(toque)
+		else:
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_criar_ia(inimigo)
 
 	hud = Hud.new()
@@ -192,7 +198,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	elif event is InputEventMouseButton and event.pressed and em_andamento \
-			and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+			and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not Jogo.toque_ativo():
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 

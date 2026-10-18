@@ -38,7 +38,7 @@ func _process(_delta: float) -> void:
 		lutador.pular()
 	if Input.is_action_just_pressed("esquivar"):
 		lutador.esquivar(lutador.direcao_movimento)
-	if Input.is_action_just_pressed("ataque_basico") and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+	if Input.is_action_just_pressed("ataque_basico") and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or Jogo.toque_ativo()):
 		lutador.ataque_basico()
 	for i in MaoCartas.TAMANHO:
 		if Input.is_action_just_pressed("carta_%d" % (i + 1)):

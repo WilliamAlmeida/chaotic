@@ -1,9 +1,12 @@
 extends Node
-## Ponto de entrada: alterna entre a tela de loadout e a batalha.
+## Ponto de entrada: título → (campanha | duelo rápido | opções) → loadout → batalha.
 ##
 ## Argumentos de linha de comando (depois de "--"):
-##   --autoteste     uma partida IA x IA, imprime o resultado e fecha
-##   --simular=N     N partidas IA x IA com loadouts aleatórios e tabela de vitórias
+##   --autoteste          uma partida IA x IA, imprime o resultado e fecha
+##   --simular=N          N partidas IA x IA com loadouts aleatórios e tabela de vitórias
+##   --roteiro=arquivo.gd script (extends Node) adicionado ao Main para dirigir testes/capturas
+##   --pasta=caminho      pasta onde os roteiros salvam capturas (ver Depuracao)
+##   --tela=nome          abre direto numa tela: titulo (padrão), loadout, batalha
 ## Exemplo (rápido, sem janela):
 ##   godot --headless --fixed-fps 60 -- --simular=20
 
@@ -18,48 +21,100 @@ var _tempos: Array = []
 func _ready() -> void:
 	randomize()
 	var simulacoes := 0
+	var tela := "titulo"
+	var roteiro := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg == "--autoteste":
 			simulacoes = 1
 		elif arg.begins_with("--simular="):
 			simulacoes = int(arg.get_slice("=", 1))
+		elif arg.begins_with("--tela="):
+			tela = arg.get_slice("=", 1)
+		elif arg.begins_with("--roteiro="):
+			roteiro = arg.get_slice("=", 1)
 	if simulacoes > 0:
 		_simulacoes_restantes = simulacoes
 		_proxima_simulacao()
 	else:
-		_abrir_loadout()
+		match tela:
+			"loadout":
+				abrir_loadout()
+			"batalha":
+				iniciar_batalha(preparar_config(Dados.gerar_loadout_ia("")))
+			_:
+				abrir_titulo()
+	if roteiro != "":
+		var script = load(roteiro)
+		if script:
+			var no: Node = script.new()
+			no.name = "Roteiro"
+			add_child(no)
 
 
-func _abrir_loadout() -> void:
+# ---------------------------------------------------------------------
+# Telas
+# ---------------------------------------------------------------------
+
+func abrir_titulo() -> void:
+	_limpar_tela()
+	var menu := MenuTitulo.new()
+	menu.campanha.connect(abrir_campanha)
+	menu.duelo_rapido.connect(abrir_loadout)
+	menu.opcoes.connect(abrir_opcoes)
+	add_child(menu)
+	_tela = menu
+	Audio.musica("menu")
+
+
+## Campanha (história): por enquanto abre o loadout; a tela própria vem na sequência.
+func abrir_campanha() -> void:
+	abrir_loadout()
+
+
+func abrir_opcoes() -> void:
+	abrir_titulo()
+
+
+func abrir_loadout() -> void:
 	_limpar_tela()
 	var loadout := Loadout.new()
 	loadout.config_inicial = _ultima_config
 	loadout.lutar.connect(func(cfg: Dictionary):
 		_ultima_config = cfg
-		_iniciar_batalha(_preparar_config(cfg)))
+		iniciar_batalha(preparar_config(cfg)))
+	if loadout.has_signal("voltar"):
+		loadout.connect("voltar", abrir_titulo)
 	add_child(loadout)
 	_tela = loadout
+	Audio.musica("menu")
 
 
-## Resolve o local sorteado e gera o oponente.
-func _preparar_config(cfg: Dictionary) -> Dictionary:
+## Resolve o local sorteado e gera o oponente (se a config ainda não trouxer um).
+func preparar_config(cfg: Dictionary) -> Dictionary:
 	var final := cfg.duplicate(true)
-	if final["local"] == "aleatorio":
+	if str(final.get("local", "aleatorio")) == "aleatorio":
 		final["local"] = Dados.locais.keys().pick_random()
 		final["local_sorteado"] = true
-	final["inimigo"] = Dados.gerar_loadout_ia(str(final["monstro"]))
+	if not final.has("inimigo"):
+		final["inimigo"] = Dados.gerar_loadout_ia(str(final["monstro"]))
 	return final
 
 
-func _iniciar_batalha(cfg: Dictionary) -> void:
+func iniciar_batalha(cfg: Dictionary) -> void:
 	_limpar_tela()
 	var batalha := Batalha.new()
 	batalha.config = cfg
 	batalha.terminou.connect(_on_batalha_terminou)
-	batalha.pediu_revanche.connect(func(): _iniciar_batalha(_preparar_config(_ultima_config)))
-	batalha.pediu_menu.connect(_abrir_loadout)
+	batalha.pediu_revanche.connect(func(): iniciar_batalha(preparar_config(_ultima_config if not _ultima_config.is_empty() else cfg)))
+	batalha.pediu_menu.connect(abrir_loadout)
 	add_child(batalha)
 	_tela = batalha
+	if not bool(cfg.get("simulacao", false)):
+		Audio.musica("luta")
+
+
+func tela_atual() -> Node:
+	return _tela
 
 
 func _limpar_tela() -> void:
@@ -69,8 +124,13 @@ func _limpar_tela() -> void:
 	_tela = null
 
 
-func _on_batalha_terminou(_vitoria: bool, detalhes: Dictionary) -> void:
+# ---------------------------------------------------------------------
+# Simulação IA x IA (balanceamento)
+# ---------------------------------------------------------------------
+
+func _on_batalha_terminou(vitoria: bool, detalhes: Dictionary) -> void:
 	if not bool(_tela.get("simulacao")):
+		Jogo.registrar_partida(vitoria)
 		return
 	var vencedor := str(detalhes["vencedor"])
 	var perdedor := str(detalhes["perdedor"])
@@ -93,7 +153,7 @@ func _proxima_simulacao() -> void:
 	cfg["inimigo"] = Dados.gerar_loadout_ia(str(cfg["monstro"]))
 	cfg["local"] = Dados.locais.keys().pick_random()
 	cfg["simulacao"] = true
-	_iniciar_batalha(cfg)
+	iniciar_batalha(cfg)
 
 
 func _imprimir_resumo() -> void:
