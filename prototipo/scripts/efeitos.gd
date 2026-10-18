@@ -53,6 +53,20 @@ static func material(cor: Color, emissao := 0.0, alfa := 1.0, sem_luz := false) 
 	return mat
 
 
+## Impacto de golpe (faíscas, pancada): chamado pelo Lutador ao acertar. forca ~ dano/10.
+static func impacto(pai: Node, pos: Vector3, cor: Color, forca := 1.0) -> void:
+	explosao(pai, pos, cor, 0.5 + 0.35 * forca, 0.25)
+
+
+## Tremor de câmera: pede à câmera do grupo "camera_orbita" para tremer (forca 0..1).
+static func tremer_camera(arvore: SceneTree, forca := 0.5) -> void:
+	if arvore == null:
+		return
+	for cam in arvore.get_nodes_in_group("camera_orbita"):
+		if cam.has_method("tremer"):
+			cam.tremer(forca)
+
+
 ## Impacto: esfera que cresce e some + anel de choque no plano do chão.
 static func explosao(pai: Node, pos: Vector3, cor: Color, raio: float, duracao := 0.35) -> void:
 	if pai == null or not pai.is_inside_tree():

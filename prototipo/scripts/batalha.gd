@@ -65,6 +65,10 @@ func _ready() -> void:
 
 	hud = Hud.new()
 	add_child(hud)
+	if bool(config.get("tutorial", false)) and not simulacao:
+		var tutorial := Tutorial.new()
+		tutorial.batalha = self
+		add_child(tutorial)
 	hud.configurar(jogador, inimigo, local)
 	hud.tempo_restante = DURACAO_MAXIMA
 	hud.revanche.connect(func(): pediu_revanche.emit())
