@@ -490,7 +490,7 @@ func _construir() -> void:
 	_raiz.add_child(_dica_no)
 
 	if _toque:
-		_dica_tecla = _rotulo("Toque na carta para atacar  •  Joystick move  •  Arraste para girar a câmera", 18, Tema.TEXTO_SUAVE)
+		_dica_tecla = _rotulo("Toque na carta para atacar  •  Joystick para andar  •  Arraste para girar a câmera", 18, Tema.TEXTO_SUAVE)
 	else:
 		_dica_tecla = _rotulo("F1  controles", 16, Tema.TEXTO_SUAVE)
 	_dica_tecla.add_theme_constant_override("outline_size", 5)

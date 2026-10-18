@@ -1,7 +1,9 @@
 class_name Batalha
 extends Node3D
-## Uma partida: monta a arena a partir da carta de Local, cria os dois lutadores,
-## roda a introdução (Local -> Iniciativa -> Equipamentos revelados) e o duelo 1x1.
+## Uma partida: monta a arena a partir da carta de Local (obstáculos, perigos e a cenografia
+## de scripts/cenario.gd), cria os dois lutadores frente a frente, roda a introdução
+## (giro de câmera pela arena -> Iniciativa -> Equipamentos revelados) e o duelo 1x1.
+## As "situações" da arena (erupção, maré alta, raio...) ficam em scripts/eventos_arena.gd.
 
 signal terminou(vitoria_jogador: bool, detalhes: Dictionary)
 signal pediu_revanche
@@ -22,23 +24,32 @@ var obstaculos: Array = []
 var tempo := 0.0
 var em_andamento := false
 var simulacao := false
+## Situações da arena (sorteadas durante a luta). `eventos.disparar("erupcao")` força uma.
+var eventos: EventosArena
+var ambiente: WorldEnvironment
+var sol: DirectionalLight3D
+var cenografia: Node3D
 
-var _vento_t := 7.0
 var _encerrada := false
+var _camera_intro: Camera3D
+var _nevoas_moveis: Array = []
 
 
 func _ready() -> void:
 	add_to_group("batalha")
 	simulacao = bool(config.get("simulacao", false))
-	local = Dados.locais[str(config["local"])]
+	# Cópia: a Falha da Rede inverte os modificadores durante a luta sem mexer nos dados globais.
+	local = Dados.locais[str(config["local"])].duplicate(true)
 	_criar_ambiente()
 	_criar_arena()
 
-	jogador = _criar_lutador(config, Vector3(0, 0.2, 9), true)
-	inimigo = _criar_lutador(config["inimigo"], Vector3(0, 0.2, -9), false)
+	var posicoes := _posicoes_iniciais()
+	jogador = _criar_lutador(config, posicoes[0], true)
+	inimigo = _criar_lutador(config["inimigo"], posicoes[1], false)
 	jogador.alvo = inimigo
 	inimigo.alvo = jogador
-	inimigo.rotation.y = PI
+	jogador.rotation.y = _angulo_para(posicoes[0], posicoes[1])
+	inimigo.rotation.y = _angulo_para(posicoes[1], posicoes[0])
 	jogador.derrotado.connect(_on_derrotado)
 	inimigo.derrotado.connect(_on_derrotado)
 
@@ -73,6 +84,15 @@ func _ready() -> void:
 	hud.tempo_restante = DURACAO_MAXIMA
 	hud.revanche.connect(func(): pediu_revanche.emit())
 	hud.menu.connect(func(): pediu_menu.emit())
+
+	eventos = EventosArena.new()
+	add_child(eventos)
+	var lista: Array = local.get("eventos", []).duplicate()
+	if bool(local.get("vento", false)) and not lista.has("rajada"):
+		lista.append("rajada")
+	eventos.configurar(self, lista)
+	for n in _nevoas_moveis:
+		eventos.registrar_nevoa_movel(n["no"], n["perigo"])
 	_intro()
 
 
@@ -157,12 +177,22 @@ func danificar_obstaculo(o: Dictionary, dano: float) -> void:
 		tw.tween_property(corpo, "scale", Vector3.ONE, 0.12)
 
 
+## Tipo do perigo no ponto ("" se nenhum). Perigos com "raio_interno" são anéis (maré alta).
 func perigo_em(pos: Vector3) -> String:
 	var plano := Vector2(pos.x, pos.z)
 	for p in perigos:
-		if plano.distance_to(p["centro"]) <= float(p["raio"]):
+		var d := plano.distance_to(p["centro"])
+		if d <= float(p["raio"]) and d >= float(p.get("raio_interno", 0.0)):
 			return str(p["tipo"])
 	return ""
+
+
+## Cria um obstáculo durante a luta (desmoronamento) e devolve sua entrada em `obstaculos`.
+func adicionar_obstaculo(pos: Vector3, raio: float, altura: float, estilo := "") -> Dictionary:
+	if estilo == "":
+		estilo = str(local.get("estilo_obstaculo", "rocha"))
+	_criar_obstaculo(Vector3(pos.x, 0.0, pos.z), raio, altura, estilo, Color(str(local["cor_chao"])))
+	return obstaculos.back()
 
 
 func _physics_process(delta: float) -> void:
@@ -179,17 +209,9 @@ func _physics_process(delta: float) -> void:
 		l.mult_velocidade_ambiente = 0.55 if perigo == "agua" and not l.voa else 1.0
 		if perigo == "lava" and l.is_on_floor() and not l.voa:
 			l.receber_dano_ambiente(DANO_LAVA_POR_SEGUNDO * delta)
-		# Capim alto e névoa escondem quem não está atacando.
-		l.escondido = perigo in ["mato", "nevoa"] and l.acao.is_empty() and not l.cantando and not l.no_alto()
-	if bool(local.get("vento", false)):
-		_vento_t -= delta
-		if _vento_t <= 0.0:
-			_vento_t = randf_range(6.0, 9.0)
-			var ang := randf() * TAU
-			var dir := Vector3(cos(ang), 0.0, sin(ang))
-			jogador.empurrar(dir * 16.0)
-			inimigo.empurrar(dir * 16.0)
-			hud.banner("Rajada de vento!", 1.0)
+		# Capim alto e névoa escondem quem não está atacando; na tempestade de areia, todo mundo.
+		var cego := eventos != null and eventos.cegueira_ativa()
+		l.escondido = (cego or (perigo in ["mato", "nevoa"] and not l.no_alto())) and l.acao.is_empty() and not l.cantando
 	if tempo >= DURACAO_MAXIMA:
 		var fracao_j := jogador.energia / jogador.energia_max
 		var fracao_i := inimigo.energia / inimigo.energia_max
@@ -210,29 +232,70 @@ func _unhandled_input(event: InputEvent) -> void:
 # Fluxo da partida
 # ---------------------------------------------------------------------
 
+## Introdução curta (<= 6 s; 1 s a menos no modo fácil): giro de câmera apresentando a
+## arena -> Iniciativa -> Equipamentos revelados -> LUTEM!
 func _intro() -> void:
+	var facil := Jogo.facil() and not simulacao
+	var t_giro := 2.0 if facil else 2.5
+	var t_iniciativa := 1.3 if facil else 1.5
+	var t_equip := 1.0 if facil else 1.2
 	var sorteado := " (sorteado)" if bool(config.get("local_sorteado", false)) else ""
-	hud.banner("%s%s" % [local["nome"], sorteado], 2.2)
-	await _esperar(2.2)
+	hud.banner("%s%s" % [local["nome"], sorteado], t_giro)
+	if not simulacao:
+		_apresentar_arena(t_giro)
+	await _esperar(t_giro)
 
 	# Iniciativa: definida pelo Local, como no card game. Empate favorece o jogador ativo.
 	var attr := str(local["iniciativa"]["atributo"])
 	var jogador_primeiro := jogador.atributo(attr) >= inimigo.atributo(attr)
 	var quem := jogador.nome if jogador_primeiro else inimigo.nome
-	hud.banner("Iniciativa (%s): %s" % [Dados.ATRIBUTOS[attr], quem], 2.0)
+	hud.banner("Iniciativa (%s): %s" % [Dados.ATRIBUTOS[attr], quem], t_iniciativa)
 	jogador.mao.iniciar(jogador.deck, 0.0 if jogador_primeiro else 2.5)
 	inimigo.mao.iniciar(inimigo.deck, 2.5 if jogador_primeiro else 0.0)
-	await _esperar(2.0)
+	await _esperar(t_iniciativa)
 
 	jogador.revelar_equipamento()
 	inimigo.revelar_equipamento()
-	hud.banner("Equipamentos revelados!", 1.6)
-	await _esperar(1.6)
+	hud.banner("Equipamentos revelados!", t_equip)
+	await _esperar(t_equip)
 
+	_encerrar_camera_intro()
 	hud.banner("LUTEM!", 1.0)
 	jogador.controles_ativos = true
 	inimigo.controles_ativos = true
 	em_andamento = true
+
+
+## Câmera própria que dá uma volta alta pela arena e desce até perto do jogador.
+func _apresentar_arena(duracao: float) -> void:
+	_camera_intro = Camera3D.new()
+	_camera_intro.fov = 62.0
+	add_child(_camera_intro)
+	_camera_intro.make_current()
+	var pj := jogador.global_position
+	var dir_j := Vector2(pj.x, pj.z).normalized() if Vector2(pj.x, pj.z).length() > 0.1 else Vector2(0, 1)
+	var ang0 := atan2(dir_j.y, dir_j.x) + 1.9
+	var ang1 := atan2(dir_j.y, dir_j.x) + 0.15
+	var passo := func(t: float):
+		if not is_instance_valid(_camera_intro):
+			return
+		var f := smoothstep(0.0, 1.0, t)
+		var ang := lerpf(ang0, ang1, f)
+		var raio := lerpf(34.0, 16.0, f)
+		var altura := lerpf(17.0, 5.5, f)
+		_camera_intro.global_position = Vector3(cos(ang) * raio, altura, sin(ang) * raio)
+		var alvo := Vector3.ZERO.lerp(inimigo.global_position + Vector3(0, 1.0, 0), f * 0.6)
+		_camera_intro.look_at(alvo, Vector3.UP)
+	var tw := _camera_intro.create_tween()
+	tw.tween_method(passo, 0.0, 1.0, duracao)
+
+
+func _encerrar_camera_intro() -> void:
+	if is_instance_valid(_camera_intro):
+		_camera_intro.queue_free()
+		_camera_intro = null
+	if is_instance_valid(camera) and is_instance_valid(camera.camera):
+		camera.camera.make_current()
 
 
 func _on_derrotado(derrotado: Lutador) -> void:
@@ -244,6 +307,7 @@ func _finalizar(vitoria: bool, motivo: String) -> void:
 		return
 	_encerrada = true
 	em_andamento = false
+	_encerrar_camera_intro()
 	jogador.controles_ativos = false
 	inimigo.controles_ativos = false
 	var vencedor := jogador if vitoria else inimigo
@@ -276,6 +340,8 @@ func _esperar(segundos: float) -> void:
 
 func _criar_lutador(cfg: Dictionary, pos: Vector3, do_jogador: bool) -> Lutador:
 	var l := Lutador.new()
+	# Chefes da campanha trazem Energia extra (fração, ex.: 0.3 = +30%).
+	l.energia_bonus = float(cfg.get("energia_bonus", 0.0))
 	l.configurar(str(cfg["monstro"]), str(cfg.get("equipamento", "")), str(cfg.get("cantico", "")), cfg["deck"])
 	l.e_jogador = do_jogador and not simulacao
 	l.local = local
@@ -284,10 +350,45 @@ func _criar_lutador(cfg: Dictionary, pos: Vector3, do_jogador: bool) -> Lutador:
 	return l
 
 
+## Jogador e inimigo frente a frente a ~9 m, girando em volta do centro até os dois
+## nascerem fora de obstáculos e de lava/água.
+func _posicoes_iniciais() -> Array[Vector3]:
+	var melhor: Array[Vector3] = [Vector3(0, 0.2, 9), Vector3(0, 0.2, -9)]
+	for passo in 12:
+		for lado in [1.0, -1.0]:
+			var ang: float = deg_to_rad(15.0 * passo) * float(lado)
+			var a := Vector3(sin(ang) * 9.0, 0.2, cos(ang) * 9.0)
+			var b := -a
+			b.y = 0.2
+			if _ponto_de_nascimento_livre(a) and _ponto_de_nascimento_livre(b):
+				return [a, b]
+			if passo == 0:
+				break
+	return melhor
+
+
+func _ponto_de_nascimento_livre(p: Vector3) -> bool:
+	var plano := Vector2(p.x, p.z)
+	for o in obstaculos:
+		if plano.distance_to(o["centro"]) < float(o["raio"]) + 1.3:
+			return false
+	for pr in perigos:
+		if str(pr["tipo"]) in ["lava", "agua"] and plano.distance_to(pr["centro"]) < float(pr["raio"]) + 0.9:
+			return false
+	return true
+
+
+func _angulo_para(de: Vector3, para: Vector3) -> float:
+	var d := para - de
+	return atan2(-d.x, -d.z)
+
+
 func _criar_ia(l: Lutador) -> void:
 	var ia := ControleIA.new()
 	ia.lutador = l
 	ia.batalha = self
+	# Simulações IA x IA usam sempre a IA normal; partidas de verdade seguem a config/modo fácil.
+	ia.dificuldade = "normal" if simulacao else str(config.get("dificuldade", "facil" if Jogo.facil() else "normal"))
 	add_child(ia)
 
 
@@ -311,11 +412,11 @@ func _criar_ambiente() -> void:
 	env.fog_density = 0.004
 	env.glow_enabled = true
 	env.glow_intensity = 0.5
-	var mundo := WorldEnvironment.new()
-	mundo.environment = env
-	add_child(mundo)
+	ambiente = WorldEnvironment.new()
+	ambiente.environment = env
+	add_child(ambiente)
 
-	var sol := DirectionalLight3D.new()
+	sol = DirectionalLight3D.new()
 	sol.light_color = Color(str(local["cor_luz"]))
 	sol.light_energy = 1.25
 	sol.shadow_enabled = true
@@ -358,6 +459,10 @@ func _criar_arena() -> void:
 		b.rotation.y = -ang
 		add_child(b)
 
+	# Cenografia fora da arena (só com janela: a simulação headless não precisa dela).
+	if not simulacao:
+		cenografia = Cenario.decorar(self, local)
+
 	var estilo := str(local.get("estilo_obstaculo", "rocha"))
 	for o in local.get("obstaculos", []):
 		_criar_obstaculo(Vector3(float(o[0]), 0.0, float(o[1])), float(o[2]), float(o[3]), estilo, cor_chao)
@@ -366,12 +471,15 @@ func _criar_arena() -> void:
 		var centro := Vector2(float(p["x"]), float(p["z"]))
 		var raio := float(p["raio"])
 		var tipo := str(p["tipo"])
-		perigos.append({"tipo": tipo, "centro": centro, "raio": raio})
+		var perigo := {"tipo": tipo, "centro": centro, "raio": raio}
+		perigos.append(perigo)
 		if tipo == "mato":
 			_criar_mato(centro, raio)
 			continue
 		if tipo == "nevoa":
-			_criar_nevoa(centro, raio)
+			var no := _criar_nevoa(centro, raio)
+			if bool(local.get("nevoa_movel", false)):
+				_nevoas_moveis.append({"no": no, "perigo": perigo})
 			continue
 		var poca := CylinderMesh.new()
 		poca.top_radius = raio
@@ -418,7 +526,11 @@ func _criar_mato(centro: Vector2, raio: float) -> void:
 		add_child(mf)
 
 
-func _criar_nevoa(centro: Vector2, raio: float) -> void:
+## Banco de névoa. Devolve o nó raiz (a névoa móvel da Rota das Tempestades é movida por ele).
+func _criar_nevoa(centro: Vector2, raio: float) -> Node3D:
+	var raiz := Node3D.new()
+	raiz.position = Vector3(centro.x, 0.0, centro.y)
+	add_child(raiz)
 	var cor := Color(str(local.get("cor_ceu_horizonte", "#e8eef2"))).lightened(0.45)
 	var gerador := RandomNumberGenerator.new()
 	gerador.seed = int(centro.x * 31 + centro.y * 17)
@@ -432,12 +544,13 @@ func _criar_nevoa(centro: Vector2, raio: float) -> void:
 		mn.mesh = esfera
 		mn.material_override = Efeitos.material(cor, 0.2, 0.38, true)
 		mn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mn.position = Vector3(centro.x + cos(ang) * r, gerador.randf_range(0.8, 1.6), centro.y + sin(ang) * r)
+		mn.position = Vector3(cos(ang) * r, gerador.randf_range(0.8, 1.6), sin(ang) * r)
 		mn.scale = Vector3(raio * 0.55, raio * 0.35, raio * 0.55) * gerador.randf_range(0.8, 1.2)
-		add_child(mn)
+		raiz.add_child(mn)
 		var tw := mn.create_tween().set_loops()
 		tw.tween_property(mn, "position:y", mn.position.y + 0.35, gerador.randf_range(1.5, 2.5)).set_trans(Tween.TRANS_SINE)
 		tw.tween_property(mn, "position:y", mn.position.y, gerador.randf_range(1.5, 2.5)).set_trans(Tween.TRANS_SINE)
+	return raiz
 
 
 func _criar_obstaculo(pos: Vector3, raio: float, altura: float, estilo: String, cor_chao: Color) -> void:
@@ -454,37 +567,4 @@ func _criar_obstaculo(pos: Vector3, raio: float, altura: float, estilo: String, 
 	col.position.y = altura / 2.0
 	corpo.add_child(col)
 
-	var tronco := CylinderMesh.new()
-	tronco.height = altura
-	var mi := MeshInstance3D.new()
-	mi.mesh = tronco
-	mi.position.y = altura / 2.0
-	corpo.add_child(mi)
-	match estilo:
-		"arvore":
-			tronco.top_radius = raio * 0.6
-			tronco.bottom_radius = raio * 0.8
-			mi.material_override = Efeitos.material_toon(Color(0.4, 0.27, 0.16))
-			var copa := SphereMesh.new()
-			copa.radius = raio * 2.1
-			copa.height = raio * 3.0
-			var mc := MeshInstance3D.new()
-			mc.mesh = copa
-			mc.material_override = Efeitos.material_toon(Color(0.22, 0.5, 0.25))
-			mc.position.y = altura + raio * 0.6
-			corpo.add_child(mc)
-		"pilar":
-			tronco.top_radius = raio
-			tronco.bottom_radius = raio
-			mi.material_override = Efeitos.material_toon(Color(0.85, 0.85, 0.8))
-			var topo := BoxMesh.new()
-			topo.size = Vector3(raio * 2.6, 0.4, raio * 2.6)
-			var mt := MeshInstance3D.new()
-			mt.mesh = topo
-			mt.material_override = Efeitos.material_toon(Color(0.9, 0.9, 0.85))
-			mt.position.y = altura
-			corpo.add_child(mt)
-		_:
-			tronco.top_radius = raio * 0.45
-			tronco.bottom_radius = raio
-			mi.material_override = Efeitos.material_toon(cor_chao.lightened(0.15))
+	Cenario.construir_obstaculo(corpo, raio, altura, estilo, cor_chao)

@@ -184,12 +184,13 @@ func _movimento_passivo(alvo: Lutador, delta: float) -> Vector3:
 	if _lateral_t <= 0.0:
 		_lateral_t = randf_range(2.0, 4.0)
 		_lateral = [-1.0, 1.0].pick_random()
+	# No tutorial o inimigo vem até perto (ao alcance do golpe) para a criança conseguir acertar.
 	var mov := Vector3.ZERO
-	if dist > 7.0:
+	if dist > 3.0:
 		mov = dir
-	elif dist > 2.5:
+	elif dist > 2.2:
 		mov = Vector3(-dir.z, 0.0, dir.x) * _lateral * 0.6
-	return _evitar_borda(mov).limit_length(1.0) * 0.35
+	return _evitar_borda(mov).limit_length(1.0) * (0.5 if dist > 7.0 else 0.35)
 
 
 ## Perto da borda da arena, puxa para dentro e para o lado (para não ficar encurralado).

@@ -48,8 +48,10 @@ static func tocar(arvore: SceneTree, pos: Vector2, soltar := true) -> void:
 		Input.parse_input_event(ev2)
 
 
-## Aperta uma ação do InputMap por alguns quadros.
+## Aperta uma ação do InputMap por alguns quadros. Espera o início de um quadro antes de
+## apertar: assim "is_action_just_pressed" dos controles vê a ação no mesmo quadro.
 static func acao(arvore: SceneTree, nome: String, quadros := 2) -> void:
+	await arvore.process_frame
 	Input.action_press(nome)
 	for i in quadros:
 		await arvore.process_frame
