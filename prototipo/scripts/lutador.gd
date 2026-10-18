@@ -39,6 +39,8 @@ var cantico: Dictionary = {}
 var atributos: Dictionary = {}
 var elementos: Array[String] = []
 var energia_max := 100.0
+## Fração extra de Energia (chefes da campanha: cfg["inimigo"]["energia_bonus"]). Aplicar antes de configurar().
+var energia_bonus := 0.0
 var energia := 100.0
 var cargas_cantico := 0
 var cargas_max := 0
@@ -141,7 +143,7 @@ func configurar(monstro_id: String, equip_id: String, cantico_id: String, deck_i
 	for chave in Dados.ATRIBUTOS:
 		atributos[chave] = float(base.get(chave, 0))
 	elementos.assign(dados_monstro["elementos"])
-	energia_max = float(dados_monstro["energia"])
+	energia_max = float(dados_monstro["energia"]) * (1.0 + energia_bonus)
 	cargas_cantico = int(dados_monstro.get("cargas_cantico", 0))
 	cargas_max = cargas_cantico
 	var dados_passiva: Dictionary = dados_monstro.get("passiva", {})
@@ -455,6 +457,9 @@ func _processar_acao(delta: float) -> Vector3:
 			if t < DURACAO_INVESTIDA:
 				var dir: Vector3 = acao["dir"]
 				resultado = dir * Dados.velocidade_investida(atk)
+				if t - float(acao.get("rastro_t", -1.0)) >= 0.06:
+					acao["rastro_t"] = t
+					Efeitos.rastro(self, cor_ataque(atk), 0.35, 1.8 * escala)
 				if not acao["feito"] and alvo \
 						and global_position.distance_to(alvo.global_position) <= 1.9 * maxf(escala, alvo.escala):
 					acao["feito"] = true

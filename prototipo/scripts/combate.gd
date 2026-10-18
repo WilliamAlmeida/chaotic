@@ -95,6 +95,8 @@ static func aplicar_ataque(ataque: Dictionary, atacante: Lutador, alvo: Lutador,
 	alvo.receber_dano(final, atacante)
 	atacante.registrar_acerto(ataque)
 	if final > 0.0:
+		Efeitos.impacto(alvo.get_parent(), alvo.centro(), atacante.cor_ataque(ataque), clampf(final / 10.0, 0.3, 1.0) * (1.4 if critico else 1.0))
+		Efeitos.tremer_camera(alvo.get_tree(), clampf(final / 30.0, 0.15, 1.0) if critico else clampf(final / 60.0, 0.1, 0.6))
 		if critico:
 			Audio.tocar("golpe_forte")
 			alvo.mostrar_texto("CRÍTICO %d" % roundi(final), Color(1.0, 0.35, 0.3), 80)
