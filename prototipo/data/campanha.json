@@ -1,0 +1,407 @@
+{
+	"mentor": {"nome": "Guardiã Lira", "quem": "mentor"},
+	"coro": {"nome": "Voz do Horizonte", "quem": "coro"},
+	"circuitos": [
+		{
+			"id": "cinzas",
+			"nome": "Circuito das Cinzas",
+			"faccao": "cinzas",
+			"descricao": "Onde a Rede acende suas primeiras faíscas.",
+			"etapas": [
+				{
+					"titulo": "Primeira Faísca",
+					"frase": "Boa luta, Duelista!",
+					"local": "patio_primeiro_eco",
+					"inimigo": {"monstro": "cindravil"},
+					"antes": [
+						{"quem": "mentor", "texto": "Bem-vindo à Rede dos Ecos, Duelista!"},
+						{"quem": "mentor", "texto": "Seu monstro é um Eco: uma lembrança viva de Teralume."},
+						{"quem": "inimigo", "texto": "Vamos treinar? Mexa-se bastante e toque nos golpes!"}
+					],
+					"vitoria": [
+						{"quem": "mentor", "texto": "Muito bem! Você sentiu? A arena tremeu um pouquinho..."},
+						{"quem": "mentor", "texto": "A Rede está estranha. Vamos investigar lutando!"}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "Quase! Cada duelo ensina algo novo. Tente de novo!"}
+					],
+					"recompensa": {"tipo": "monstro", "id": "cindravil"}
+				},
+				{
+					"titulo": "Asas de Brasa",
+					"frase": "Olhe para cima!",
+					"local": "caldeira_rubra",
+					"inimigo": {"monstro": "cinzalar"},
+					"antes": [
+						{"quem": "inimigo", "texto": "Eu voo alto! Será que você me alcança?"},
+						{"quem": "mentor", "texto": "Dica: golpes de longe acertam quem está voando."}
+					],
+					"vitoria": [
+						{"quem": "inimigo", "texto": "Que velocidade! Você merece voar comigo."}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "Quem voa é esperto, mas cai. Tente de novo com projéteis!"}
+					],
+					"recompensa": {"tipo": "monstro", "id": "cinzalar"}
+				},
+				{
+					"titulo": "Canto da Fornalha",
+					"frase": "Interrompa o Cântico dele!",
+					"local": "caldeira_rubra",
+					"inimigo": {"monstro": "pirocanto"},
+					"antes": [
+						{"quem": "inimigo", "texto": "Ouça meu Cântico... ele queima!"},
+						{"quem": "mentor", "texto": "Bata nele enquanto ele canta. Isso interrompe a música!"}
+					],
+					"vitoria": [
+						{"quem": "inimigo", "texto": "Sua música é mais forte. Mas eu ouvi outra voz... vinda do horizonte."}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "O fogo dele é forte. Use a esquiva e volte!"}
+					],
+					"recompensa": {"tipo": "monstro", "id": "pirocanto"}
+				},
+				{
+					"titulo": "O Colosso Braseonte",
+					"frase": "Chefe: dance em volta dele!",
+					"local": "caldeira_rubra",
+					"chefe": true,
+					"regra": "O chefe tem +30% de Energia.",
+					"inimigo": {"monstro": "braseonte", "energia_bonus": 0.3},
+					"antes": [
+						{"quem": "inimigo", "texto": "EU SOU A MONTANHA. Ninguém passa!"},
+						{"quem": "mentor", "texto": "Ele é enorme e lento. Dance em volta dele!"}
+					],
+					"vitoria": [
+						{"quem": "inimigo", "texto": "Hmpf... forte. Antes de você, algo passou por aqui. Algo que não era um Eco."},
+						{"quem": "mentor", "texto": "Uma pista! Vamos para o Reino das Marés."}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "Grande, hein? Respire fundo e tente outra vez."}
+					],
+					"recompensa": {"tipo": "monstro", "id": "braseonte"}
+				}
+			]
+		},
+		{
+			"id": "mares",
+			"nome": "Circuito das Marés",
+			"faccao": "mares",
+			"descricao": "Arenas sobre a água, onde tudo flui.",
+			"etapas": [
+				{
+					"titulo": "Ondas Gêmeas",
+					"frase": "Pule por cima da água!",
+					"local": "terraco_mares",
+					"inimigo": {"monstro": "velamar"},
+					"antes": [
+						{"quem": "inimigo", "texto": "Olá! Eu nado rápido e ataco em fluxo. Acompanha?"},
+						{"quem": "mentor", "texto": "A água deixa lento. Pule por cima!"}
+					],
+					"vitoria": [
+						{"quem": "inimigo", "texto": "Que luta boa! Toma, uma Lâmina de Fluxo para você."}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "A água é traiçoeira. Fique na parte seca!"}
+					],
+					"recompensa": {"tipo": "equipamento", "id": "lamina_fluxo"}
+				},
+				{
+					"titulo": "Segredo do Oráculo",
+					"frase": "Ela vê o futuro nas ondas.",
+					"local": "jardim_condutores",
+					"inimigo": {"monstro": "nacarim"},
+					"antes": [
+						{"quem": "inimigo", "texto": "Eu vejo o futuro nas ondas... e vejo uma rachadura no céu."},
+						{"quem": "mentor", "texto": "Rachadura? Vença e ela conta mais."}
+					],
+					"vitoria": [
+						{"quem": "inimigo", "texto": "Você venceu. Então ouça: alguém de fora está usando a Rede."}
+					],
+					"derrota": [
+						{"quem": "inimigo", "texto": "As ondas dizem: tente de novo!"}
+					],
+					"recompensa": {"tipo": "monstro", "id": "nacarim"}
+				},
+				{
+					"titulo": "Eco Estranho",
+					"frase": "Esse Eco não devia estar aqui...",
+					"local": "terraco_mares",
+					"inimigo": {"monstro": "sirocal", "coro": true},
+					"antes": [
+						{"quem": "mentor", "texto": "Um Eco das dunas aqui? Ele não devia estar neste circuito!"},
+						{"quem": "coro", "texto": "...nós... entramos... pela... Rede..."},
+						{"quem": "mentor", "texto": "Essa voz! Cuidado, Duelista!"}
+					],
+					"vitoria": [
+						{"quem": "mentor", "texto": "O Eco voltou ao normal. Mas quem falou por ele?"}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "Esse Eco está confuso. Tente de novo, você consegue!"}
+					],
+					"recompensa": {"tipo": "equipamento", "id": "concha_memoria"}
+				},
+				{
+					"titulo": "Guardião do Abismo",
+					"frase": "Chefe: golpes rápidos!",
+					"local": "terraco_mares",
+					"chefe": true,
+					"regra": "O chefe tem +30% de Energia e a névoa esconde quem não ataca.",
+					"inimigo": {"monstro": "abissarca", "energia_bonus": 0.3},
+					"antes": [
+						{"quem": "inimigo", "texto": "Eu guardo o fundo do mar. Mostre sua força!"},
+						{"quem": "mentor", "texto": "Empurrões não funcionam nele. Use golpes rápidos!"}
+					],
+					"vitoria": [
+						{"quem": "inimigo", "texto": "Você é digno. A voz vem do Horizonte Partido. Procure a Colmeia de Rocha."}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "Ele é duro como concha. Mais uma vez!"}
+					],
+					"recompensa": {"tipo": "monstro", "id": "abissarca"}
+				}
+			]
+		},
+		{
+			"id": "rocha",
+			"nome": "Circuito Mineral",
+			"faccao": "rocha",
+			"descricao": "Pedra, cristal e capim alto.",
+			"etapas": [
+				{
+					"titulo": "Chifres de Pedra",
+					"frase": "Esquive na hora certa!",
+					"local": "pedreira_viva",
+					"inimigo": {"monstro": "craguil"},
+					"antes": [
+						{"quem": "inimigo", "texto": "Investida! É assim que a Colmeia cumprimenta."},
+						{"quem": "mentor", "texto": "Esquive na hora certa e ele passa direto."}
+					],
+					"vitoria": [
+						{"quem": "inimigo", "texto": "Boa esquiva! Você faz parte da Colmeia agora."}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "A esquiva é o segredo. Tente de novo!"}
+					],
+					"recompensa": {"tipo": "monstro", "id": "craguil"}
+				},
+				{
+					"titulo": "Luz no Bosque",
+					"frase": "Esconda-se no capim alto.",
+					"local": "bosque_sussurrante",
+					"inimigo": {"monstro": "prismolito"},
+					"antes": [
+						{"quem": "inimigo", "texto": "Minhas faces refletem tudo. Até a sua estratégia."},
+						{"quem": "mentor", "texto": "Use o capim alto para se esconder e surpreender."}
+					],
+					"vitoria": [
+						{"quem": "inimigo", "texto": "Fascinante. Meus cristais registraram: os invasores vêm de fora de Teralume."}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "Esconda-se no capim e espere as cartas recarregarem!"}
+					],
+					"recompensa": {"tipo": "monstro", "id": "prismolito"}
+				},
+				{
+					"titulo": "Eco Rachado",
+					"frase": "Outro Eco invadido!",
+					"local": "pedreira_viva",
+					"inimigo": {"monstro": "braseonte", "coro": true},
+					"antes": [
+						{"quem": "coro", "texto": "...a... pedra... também... é... nossa..."},
+						{"quem": "mentor", "texto": "Outro Eco invadido! Eles estão em todo lugar."}
+					],
+					"vitoria": [
+						{"quem": "mentor", "texto": "Ufa! O Selo Prismático vai proteger sua mente."}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "Pesado, né? Fique longe e use projéteis."}
+					],
+					"recompensa": {"tipo": "equipamento", "id": "selo_prismatico"}
+				},
+				{
+					"titulo": "O Monólito",
+					"frase": "Chefe: Área e Salto!",
+					"local": "pedreira_viva",
+					"chefe": true,
+					"regra": "O chefe tem +30% de Energia e investidas causam menos dano nele.",
+					"inimigo": {"monstro": "talhuno", "energia_bonus": 0.3},
+					"antes": [
+						{"quem": "inimigo", "texto": "EU. NÃO. CAIO."},
+						{"quem": "mentor", "texto": "Golpes de Área e saltos! Não tente empurrar."}
+					],
+					"vitoria": [
+						{"quem": "inimigo", "texto": "...caí. Alguém está partindo a Rede ao meio. Os Nômades viram o rasgo no céu."}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "Um gigante de verdade. Descanse e tente de novo."}
+					],
+					"recompensa": {"tipo": "cantico", "id": "acorde_monolito"}
+				}
+			]
+		},
+		{
+			"id": "areia",
+			"nome": "Circuito Errante",
+			"faccao": "areia",
+			"descricao": "Dunas que mudam a cada vento.",
+			"etapas": [
+				{
+					"titulo": "Sombra no Céu",
+					"frase": "Projéteis para quem voa!",
+					"local": "dunas_vidro",
+					"inimigo": {"monstro": "aerisca"},
+					"antes": [
+						{"quem": "inimigo", "texto": "Do alto eu vejo tudo! Lá no horizonte, o céu está rachado."},
+						{"quem": "mentor", "texto": "Projéteis para quem voa, lembra?"}
+					],
+					"vitoria": [
+						{"quem": "inimigo", "texto": "Rápido como o vento! Voe comigo."}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "Olhe para cima e atire!"}
+					],
+					"recompensa": {"tipo": "monstro", "id": "aerisca"}
+				},
+				{
+					"titulo": "Miragem",
+					"frase": "Qual é a verdadeira?",
+					"local": "dunas_vidro",
+					"inimigo": {"monstro": "miralume"},
+					"antes": [
+						{"quem": "inimigo", "texto": "Qual sou eu? Esta... ou aquela?"},
+						{"quem": "mentor", "texto": "Ela deixa imagens falsas. Mire na que brilha."}
+					],
+					"vitoria": [
+						{"quem": "inimigo", "texto": "Você enxerga bem. O rasgo no céu se chama Fenda do Horizonte."}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "A miragem engana. Respire e tente de novo!"}
+					],
+					"recompensa": {"tipo": "monstro", "id": "miralume"}
+				},
+				{
+					"titulo": "Tempestade Partida",
+					"frase": "Eles estão quase aqui.",
+					"local": "dunas_vidro",
+					"inimigo": {"monstro": "pirocanto", "coro": true},
+					"antes": [
+						{"quem": "coro", "texto": "...logo... o... horizonte... se... abre..."},
+						{"quem": "mentor", "texto": "Eles estão quase aqui. Lute com tudo!"}
+					],
+					"vitoria": [
+						{"quem": "mentor", "texto": "Esse Sabre do Siroco é veloz como você."}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "O vento está contra. Tente outra vez!"}
+					],
+					"recompensa": {"tipo": "equipamento", "id": "sabre_siroco"}
+				},
+				{
+					"titulo": "Senhor das Dunas",
+					"frase": "Chefe: espere o vento passar.",
+					"local": "dunas_vidro",
+					"chefe": true,
+					"regra": "O chefe tem +30% de Energia e o vento sopra mais forte.",
+					"inimigo": {"monstro": "dunamonte", "energia_bonus": 0.3},
+					"antes": [
+						{"quem": "inimigo", "texto": "A areia muda. Eu também. Vamos ver se você acompanha."},
+						{"quem": "mentor", "texto": "Mantenha distância e espere as rajadas passarem."}
+					],
+					"vitoria": [
+						{"quem": "inimigo", "texto": "Você é um verdadeiro Nômade. A Fenda está aberta. Vá, antes que o Coro entre inteiro!"},
+						{"quem": "mentor", "texto": "Para a Convergência, Duelista! Todas as facções estão com você."}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "A duna é teimosa. Você também é! De novo!"}
+					],
+					"recompensa": {"tipo": "monstro", "id": "dunamonte"}
+				}
+			]
+		},
+		{
+			"id": "convergencia",
+			"nome": "Convergência",
+			"faccao": "coro",
+			"descricao": "A Fenda do Horizonte. A luta final.",
+			"etapas": [
+				{
+					"titulo": "Portal Partido",
+					"frase": "Lembranças que lutam!",
+					"local": "fenda_horizonte",
+					"local_reserva": "patio_primeiro_eco",
+					"inimigo": {"monstro": "cinzalar", "coro": true},
+					"antes": [
+						{"quem": "coro", "texto": "Vocês... são... só... lembranças..."},
+						{"quem": "mentor", "texto": "Lembranças que lutam! Mostre a eles!"}
+					],
+					"vitoria": [
+						{"quem": "mentor", "texto": "Um a menos! Você brilha, Duelista."}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "Eles são estranhos, mas não invencíveis. De novo!"}
+					],
+					"recompensa": {"tipo": "cantico", "id": "coro_fornalha"}
+				},
+				{
+					"titulo": "Coro das Profundezas",
+					"frase": "Interrompa o Cântico!",
+					"local": "fenda_horizonte",
+					"local_reserva": "jardim_condutores",
+					"inimigo": {"monstro": "nacarim", "coro": true},
+					"antes": [
+						{"quem": "coro", "texto": "O... oráculo... agora... canta... para... nós..."},
+						{"quem": "mentor", "texto": "Bata nela enquanto ela canta!"}
+					],
+					"vitoria": [
+						{"quem": "mentor", "texto": "Ela está livre! Falta pouco."}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "Quase lá. Tente mais uma vez!"}
+					],
+					"recompensa": {"tipo": "cantico", "id": "cancao_renovacao"}
+				},
+				{
+					"titulo": "Cristal Quebrado",
+					"frase": "Regras novas!",
+					"local": "fenda_horizonte",
+					"local_reserva": "bosque_sussurrante",
+					"inimigo": {"monstro": "prismolito", "coro": true},
+					"antes": [
+						{"quem": "coro", "texto": "Suas... regras... não... valem... aqui..."},
+						{"quem": "mentor", "texto": "Então vamos escrever regras novas!"}
+					],
+					"vitoria": [
+						{"quem": "mentor", "texto": "A Fenda está tremendo. O Arauto está vindo!"}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "Força! A Rede precisa de você."}
+					],
+					"recompensa": {"tipo": "cantico", "id": "hino_horizonte"}
+				},
+				{
+					"titulo": "Arauto do Horizonte",
+					"frase": "A luta final!",
+					"local": "fenda_horizonte",
+					"local_reserva": "jardim_condutores",
+					"chefe": true,
+					"regra": "O Arauto tem +30% de Energia e a arena inverte os bônus.",
+					"inimigo": {"monstro": "miralume", "coro": true, "energia_bonus": 0.3},
+					"antes": [
+						{"quem": "coro", "texto": "EU SOU O HORIZONTE PARTIDO. TERALUME SERÁ NOSSA."},
+						{"quem": "mentor", "texto": "Esta é a luta final. Todas as facções estão com você!"}
+					],
+					"vitoria": [
+						{"quem": "coro", "texto": "...impossível... uma... lembrança... nos... venceu..."},
+						{"quem": "mentor", "texto": "A Fenda se fechou! Você salvou a Rede dos Ecos!"},
+						{"quem": "mentor", "texto": "O Coro vai voltar um dia. E você estará pronto, Guardião da Rede!"}
+					],
+					"derrota": [
+						{"quem": "mentor", "texto": "O Arauto é forte. Mas você é mais. Mais uma vez!"}
+					],
+					"recompensa": {"tipo": "titulo", "id": "Guardião da Rede"}
+				}
+			]
+		}
+	]
+}
