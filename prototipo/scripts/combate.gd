@@ -78,6 +78,7 @@ static func aplicar_ataque(ataque: Dictionary, atacante: Lutador, alvo: Lutador,
 	if alvo.invulneravel():
 		alvo.mostrar_texto("Esquivou!", Color(0.85, 0.85, 0.85))
 		return
+	Audio.tocar("golpe")
 
 	var dano := float(ataque.get("dano_base", 0)) + dano_elemental(ataque, atacante, local) * atacante.mult_elemental(ataque)
 	var cond: Dictionary = ataque.get("condicao", {})
@@ -95,6 +96,7 @@ static func aplicar_ataque(ataque: Dictionary, atacante: Lutador, alvo: Lutador,
 	atacante.registrar_acerto(ataque)
 	if final > 0.0:
 		if critico:
+			Audio.tocar("golpe_forte")
 			alvo.mostrar_texto("CRÍTICO %d" % roundi(final), Color(1.0, 0.35, 0.3), 80)
 		else:
 			alvo.mostrar_texto("%d" % roundi(final), Color(1.0, 0.95, 0.9))

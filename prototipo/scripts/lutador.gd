@@ -5,6 +5,12 @@ extends CharacterBody3D
 ## ataque_basico, usar_carta, iniciar_cantico e cantico_tecla.
 
 signal derrotado(lutador: Lutador)
+## Avisos do que aconteceu de fato (usados pelo tutorial e pela HUD).
+signal acertou(ataque: Dictionary)
+signal esquivou
+signal pulou
+signal usou_carta(id: String)
+signal cantico_terminou(sucesso: bool)
 
 const GRAVIDADE := 24.0
 const RAIO_ARENA := 20.0
@@ -12,6 +18,9 @@ const ALCANCE_BASICO := 2.3
 const VELOCIDADE_ESQUIVA := 17.0
 const DURACAO_INVESTIDA := 0.45
 const TAMANHO_SEQUENCIA_CANTICO := 4
+## Modo fácil: Cântico de 2 notas e "ímã" do golpe básico (puxa até o alvo a esta distância).
+const TAMANHO_SEQUENCIA_FACIL := 2
+const ALCANCE_IMA := 4.5
 const TECLAS_CANTICO := ["mover_frente", "mover_esq", "mover_tras", "mover_dir"]
 const DURACAO_ESCUDO := 8.0
 const JANELA_COMBO := 2.5
@@ -64,6 +73,10 @@ var voa := false
 ## Dentro de capim alto/névoa e parado de atacar: projéteis não perseguem e a IA perde de vista.
 var escondido := false
 var combo := 0
+## Conta cada ação iniciada (as dicas do modo fácil usam para avisar uma vez por golpe).
+var acao_numero := 0
+## Dicas automáticas do modo fácil ("Esquiva!"); o tutorial desliga enquanto guia o jogador.
+var dicas_ativas := true
 
 var cantando := false
 var cantico_t := 0.0
@@ -83,6 +96,9 @@ var _corpo_duna_espera := 0.0
 var _combo_t := 0.0
 var _subida_t := 0.0
 var _mergulho := false
+var _dica_t := 0.0
+var _dica_acao := 0
+var _dica_mao_t := 0.0
 
 # --- Visual ---
 var _visual: Node3D
@@ -177,6 +193,8 @@ func recarga_esquiva() -> float:
 	var r := maxf(0.6, 2.2 - atributo("agilidade") * 0.012)
 	if passiva == "corrente_lateral" and _t_movendo >= 2.0:
 		r *= 0.5
+	if assistido():
+		r *= 0.7
 	return r
 
 ## Agilidade alta = golpes básicos mais rápidos.
@@ -204,6 +222,21 @@ func dano_basico() -> float:
 func invulneravel() -> bool:
 	return invulneravel_t > 0.0
 
+
+## Assistências do modo fácil valem só para o monstro do jogador (a IA não ganha nada).
+func assistido() -> bool:
+	return e_jogador and Jogo.facil()
+
+
+## Alcance do golpe básico; no modo fácil cresce ~40% (junto com o "ímã" que puxa até o alvo).
+func alcance_basico() -> float:
+	return ALCANCE_BASICO * (1.4 if assistido() else 1.0)
+
+
+## Quantas notas o Cântico pede: 2 no modo fácil, 4 no normal (a HUD mostra essa quantidade).
+func cantico_tamanho() -> int:
+	return TAMANHO_SEQUENCIA_FACIL if assistido() else TAMANHO_SEQUENCIA_CANTICO
+
 ## Voando alto: fora do alcance de golpes de área, investidas e golpe básico.
 func no_alto() -> bool:
 	return voa and global_position.y > 3.2
@@ -225,6 +258,8 @@ func pode_agir() -> bool:
 
 func modificar_dano_causado(valor: float, ataque: Dictionary = {}) -> Array:
 	var arquetipo := str(ataque.get("arquetipo", ""))
+	if assistido():
+		valor *= 1.1
 	if passiva == "vantagem_altura" and no_alto() and arquetipo == "projetil":
 		valor *= 1.2
 	if _instinto and arquetipo in ["basico", "investida"]:
@@ -244,6 +279,8 @@ func modificar_dano_causado(valor: float, ataque: Dictionary = {}) -> Array:
 ## Retorna o dano que realmente chega à Energia (o escudo absorve primeiro).
 func modificar_dano_recebido(valor: float, ataque: Dictionary = {}) -> float:
 	valor *= 1.0 - reducao_dano
+	if assistido():
+		valor *= 0.75
 	match passiva:
 		"pele_rocha":
 			valor -= 2.0
@@ -287,6 +324,7 @@ func registrar_acerto(ataque: Dictionary) -> void:
 	_combo_t = JANELA_COMBO
 	if passiva == "impulso_de_lasca" and str(ataque.get("arquetipo", "")) == "investida":
 		_impulso_t = 2.0
+	acertou.emit(ataque)
 
 
 # =====================================================================
@@ -310,6 +348,8 @@ func _physics_process(delta: float) -> void:
 		mao.processar(delta)
 		if passiva == "fluxo":
 			curar(2.0 * delta, false)
+		if dicas_ativas and assistido():
+			_dicas(delta)
 
 	var horizontal := Vector3.ZERO
 	var usar_fisica := true
@@ -380,11 +420,16 @@ func _processar_acao(delta: float) -> Vector3:
 	var resultado := Vector3.ZERO
 	match str(acao["tipo"]):
 		"basico":
+			if bool(acao.get("ima", false)) and t < 0.15 and alvo:
+				# Ímã do modo fácil: durante a preparação do golpe, avança até encostar no alvo.
+				var folga := _distancia_plana(alvo) - 1.6 * maxf(escala, alvo.escala)
+				if folga > 0.0:
+					resultado = _direcao_plana_para(alvo) * minf(folga / 0.15, 18.0)
 			if not acao["feito"] and t >= 0.15:
 				acao["feito"] = true
 				var ponto := global_position + _frente() * 1.2 * escala + Vector3(0, 1.0 * escala, 0)
 				Efeitos.explosao(get_parent(), ponto, Color(1, 1, 1), 0.6, 0.2)
-				if alvo and _distancia_plana(alvo) <= ALCANCE_BASICO * maxf(escala, alvo.escala) \
+				if alvo and _distancia_plana(alvo) <= alcance_basico() * maxf(escala, alvo.escala) \
 						and absf(alvo.global_position.y - global_position.y) < 2.2:
 					Combate.aplicar_ataque(_ataque_basico_dados(), self, alvo, local)
 			if t >= 0.35:
@@ -450,8 +495,12 @@ func pular() -> void:
 	if voa:
 		if _subida_t <= 0.0:
 			_subida_t = DURACAO_SUBIDA
+			Audio.tocar("vento")
+			pulou.emit()
 	elif is_on_floor():
 		velocity.y = 9.0
+		Audio.tocar("salto")
+		pulou.emit()
 
 
 func _aplicar_vertical(delta: float) -> void:
@@ -478,31 +527,42 @@ func esquivar(dir: Vector3) -> void:
 	esquiva_dir = dir.normalized() if dir.length() > 0.1 else -_frente()
 	esquiva_t = 0.2
 	invulneravel_t = 0.4 if (passiva == "corrente_lateral" and _t_movendo >= 2.0) else 0.3
+	if assistido():
+		invulneravel_t += 0.15
 	esquiva_recarga = recarga_esquiva()
 	if passiva == "instinto_felino":
 		_instinto = true
 	if passiva == "rastro_quente":
 		_rastro_quente = true
+	Audio.tocar("esquiva")
+	esquivou.emit()
 
 
 func ataque_basico() -> void:
 	if not pode_agir() or basico_recarga > 0.0:
 		return
 	basico_recarga = recarga_basico()
+	# Ímã do modo fácil: alvo perto e à frente -> o golpe "puxa" até ele (a IA não ganha isso).
+	var ima := false
+	if assistido() and alvo and not alvo.no_alto():
+		ima = _distancia_plana(alvo) <= ALCANCE_IMA and _frente().dot(_direcao_plana_para(alvo)) > 0.1
 	_encarar_alvo()
-	acao = {"tipo": "basico", "t": 0.0, "feito": false}
+	acao_numero += 1
+	acao = {"tipo": "basico", "t": 0.0, "feito": false, "ima": ima}
 
 
 func usar_carta(indice: int) -> bool:
 	if not pode_agir() or not mao.pode_usar(indice) or alvo == null:
 		return false
-	var id := mao.usar(indice, mult_recarga())
+	# Modo fácil: cartas recarregam ~20% mais rápido.
+	var id := mao.usar(indice, mult_recarga() * (0.8 if assistido() else 1.0))
 	var atk: Dictionary = Dados.ataques[id]
 	if _rastro_quente and str(atk["arquetipo"]) == "projetil":
 		_rastro_quente = false
 		mao.recarga[indice] *= 0.8
 		mao.recarga_total[indice] *= 0.8
 	_encarar_alvo()
+	acao_numero += 1
 	acao = {"tipo": str(atk["arquetipo"]), "t": 0.0, "feito": false, "ataque": atk}
 	var cor := cor_ataque(atk)
 	match str(atk["arquetipo"]):
@@ -510,6 +570,10 @@ func usar_carta(indice: int) -> bool:
 			acao["dir"] = _direcao_plana_para(alvo)
 		"salto":
 			var destino := alvo.global_position - _direcao_plana_para(alvo) * 1.4
+			if assistido():
+				# Modo fácil: o salto cai em cima do alvo, prevendo um pouco o movimento dele.
+				destino = alvo.global_position + Vector3(alvo.velocity.x, 0.0, alvo.velocity.z) * 0.3 \
+					- _direcao_plana_para(alvo) * 0.5
 			var plano := Vector2(destino.x, destino.z).limit_length(RAIO_ARENA)
 			destino = Vector3(plano.x, 0.0, plano.y)
 			acao["inicio"] = global_position
@@ -518,6 +582,8 @@ func usar_carta(indice: int) -> bool:
 		"area":
 			Efeitos.telegrafo(get_parent(), global_position, Dados.raio_ataque(atk), cor, 0.5)
 	mostrar_texto(str(atk["nome"]), cor, 44)
+	Audio.tocar("carta")
+	usou_carta.emit(id)
 	return true
 
 
@@ -528,8 +594,10 @@ func iniciar_cantico() -> void:
 	cantico_t = 0.0
 	cantico_progresso = 0
 	cantico_limite = 2.6 + atributo("mente") * 0.01
+	if assistido():
+		cantico_limite += 2.5
 	cantico_sequencia.clear()
-	for i in TAMANHO_SEQUENCIA_CANTICO:
+	for i in cantico_tamanho():
 		cantico_sequencia.append(TECLAS_CANTICO.pick_random())
 	mostrar_texto(str(cantico["nome"]), Color(0.85, 0.65, 1.0), 44)
 	Efeitos.telegrafo(get_parent(), global_position, 2.0, _cor_cantico(), 0.6)
@@ -541,8 +609,14 @@ func cantico_tecla(acao_nome: String) -> void:
 		return
 	if acao_nome == cantico_sequencia[cantico_progresso]:
 		cantico_progresso += 1
+		Audio.tocar("cantico_nota", 0.0, 1.0 + 0.12 * cantico_progresso)
 		if cantico_progresso >= cantico_sequencia.size():
 			_concluir_cantico()
+	elif assistido():
+		# Modo fácil: errar só reinicia a sequência (não cancela nem gasta a carga).
+		cantico_progresso = 0
+		mostrar_texto("Ops! De novo", Color(1.0, 0.85, 0.5), 44)
+		Audio.tocar("aviso")
 	else:
 		_falhar_cantico("nota errada")
 
@@ -583,6 +657,8 @@ func receber_dano(valor: float, _origem: Lutador = null) -> void:
 	energia = maxf(0.0, energia - valor)
 	_flash_t = 0.12
 	_dano_anim_t = 0.35
+	if e_jogador:
+		Audio.tocar("dano")
 	if cantando:
 		_falhar_cantico("interrompido")
 	if energia <= 0.0:
@@ -693,10 +769,12 @@ func _concluir_cantico() -> void:
 	cargas_cantico -= 1
 	var mult := mult_cantico()
 	var cor := _cor_cantico()
+	Audio.tocar("cantico_ok")
 	match str(cantico.get("tipo", "")):
 		"cura":
 			Efeitos.explosao(get_parent(), centro(), Color(0.4, 1.0, 0.6), 2.2, 0.5)
 			curar(float(cantico["valor"]) * mult)
+			Audio.tocar("cura")
 		"dano":
 			var alcance := float(cantico.get("alcance", 12))
 			Efeitos.telegrafo(get_parent(), global_position, alcance, cor, 0.4)
@@ -711,18 +789,26 @@ func _concluir_cantico() -> void:
 			escudo_t = DURACAO_ESCUDO
 			_mostrar_escudo(cor)
 			mostrar_texto("Escudo %d" % roundi(escudo), cor.lightened(0.4), 52)
+			Audio.tocar("escudo")
 	if passiva == "refrao_igneo":
 		_refrao = true
 	elif passiva == "refracao_tatica":
 		_refracao = true
+	cantico_terminou.emit(true)
 
 
 func _falhar_cantico(motivo: String) -> void:
 	if not cantando:
 		return
 	cantando = false
-	cargas_cantico = maxi(0, cargas_cantico - 1)
-	mostrar_texto("Cântico falhou (%s)" % motivo, Color(0.7, 0.7, 0.75), 40)
+	if assistido():
+		# Modo fácil: a carga não é perdida; é só tentar de novo.
+		mostrar_texto("Cântico parou", Color(0.8, 0.75, 0.9), 40)
+	else:
+		cargas_cantico = maxi(0, cargas_cantico - 1)
+		mostrar_texto("Cântico falhou (%s)" % motivo, Color(0.7, 0.7, 0.75), 40)
+	Audio.tocar("cantico_falha")
+	cantico_terminou.emit(false)
 
 
 func _cor_cantico() -> Color:
@@ -784,6 +870,60 @@ func _disparar_projetil(atk: Dictionary) -> void:
 	get_parent().add_child(p)
 	p.global_position = centro() + _frente() * 0.9 * escala
 	p.direcao = (alvo.centro() - p.global_position).normalized() if alvo else _frente()
+	if assistido():
+		# Modo fácil: o projétil persegue o alvo com mais vontade (ver Projetil._curva).
+		p.set("_curva", 2.6)
+	Audio.tocar("projetil")
+
+
+## Dicas automáticas do modo fácil: poucas, grandes e com intervalo, para não poluir a tela.
+func _dicas(delta: float) -> void:
+	_dica_t = maxf(0.0, _dica_t - delta)
+	if alvo == null or alvo.energia <= 0.0 or energia <= 0.0:
+		return
+	# "Esquiva!" quando o inimigo telegrafa área, salto ou investida que vai nos pegar.
+	var tipo := str(alvo.acao.get("tipo", ""))
+	if alvo.acao_numero != _dica_acao and tipo in ["area", "salto", "investida"]:
+		_dica_acao = alvo.acao_numero
+		if _em_perigo(tipo) and esquiva_recarga <= 0.0 and _dica_t <= 0.0:
+			_dica_t = 2.5
+			mostrar_texto("Esquiva!", Color(1.0, 0.95, 0.3), 64)
+			Audio.tocar("aviso")
+	# "Use uma carta!" se a mão fica cheia por muito tempo sem ser usada.
+	var mao_cheia := true
+	for i in MaoCartas.TAMANHO:
+		if not mao.pode_usar(i):
+			mao_cheia = false
+	_dica_mao_t = _dica_mao_t + delta if mao_cheia else 0.0
+	if _dica_mao_t >= 10.0 and _dica_t <= 0.0 and pode_agir():
+		_dica_mao_t = 0.0
+		_dica_t = 6.0
+		mostrar_texto("Use uma carta!", Color(0.6, 0.9, 1.0), 52)
+	# "Cante!" quando a Energia está baixa e o Cântico de cura/escudo está disponível.
+	if energia < energia_max * 0.35 and cargas_cantico > 0 and _dica_t <= 0.0 \
+			and str(cantico.get("tipo", "")) in ["cura", "escudo"] and pode_agir() and _distancia_plana(alvo) > 5.0:
+		_dica_t = 8.0
+		mostrar_texto("Cante!", Color(0.85, 0.65, 1.0), 56)
+
+
+## O golpe que o inimigo começou vai alcançar este lutador?
+func _em_perigo(tipo: String) -> bool:
+	var atk: Dictionary = alvo.acao.get("ataque", {})
+	match tipo:
+		"area":
+			return _distancia_plana(alvo) <= Dados.raio_ataque(atk) + 1.5
+		"salto":
+			var destino: Vector3 = alvo.acao.get("destino", alvo.global_position)
+			var d := global_position - destino
+			d.y = 0.0
+			return d.length() <= Dados.raio_ataque(atk) + 1.5
+		"investida":
+			var dir: Vector3 = alvo.acao.get("dir", Vector3.ZERO)
+			var ate := global_position - alvo.global_position
+			ate.y = 0.0
+			return ate.length() <= Dados.velocidade_investida(atk) * DURACAO_INVESTIDA + 2.0 \
+				and dir.dot(ate.normalized()) > 0.6
+	return false
 
 
 func _frente() -> Vector3:
